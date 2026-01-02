@@ -1,0 +1,23 @@
+
+> frontend@0.1.0 dev
+> next dev --turbo
+
+ ⚠ Port 3000 is in use by process 38710, using available port 3002 instead.
+   ▲ Next.js 15.5.9 (Turbopack)
+   - Local:        http://localhost:3002
+   - Network:      http://192.168.5.59:3002
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · clientTraceMetadata
+
+ ✓ Starting...
+ ○ Compiling instrumentation Node.js ...
+ ✓ Compiled instrumentation Node.js in 1964ms
+ ✓ Compiled instrumentation Edge in 436ms
+ ✓ Compiled middleware in 218ms
+ ✓ Ready in 5.6s
+ ⚠ Webpack is configured while Turbopack is not, which may cause problems.
+ ⚠ See instructions if you need to configure Turbopack:
+  https://nextjs.org/docs/app/api-reference/next-config-js/turbopack
+
+[?25h

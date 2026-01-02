@@ -1,0 +1,22 @@
+/* Web3Auth Modal Z-Index Override */
+.w3a-modal {
+  z-index: 999999 !important;
+}
+
+.w3a-modal__inner {
+  z-index: 999999 !important;
+}
+
+#w3a-modal {
+  z-index: 999999 !important;
+}
+
+/* Ensure the iframe is visible */
+iframe[id^="openlogin-iframe"] {
+  z-index: 999999 !important;
+}
+
+/* Web3Auth backdrop */
+.w3a-modal-backdrop {
+  z-index: 999998 !important;
+}
