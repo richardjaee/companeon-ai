@@ -1,0 +1,237 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Michroma&display=swap');
+@import '../styles/web3auth-override.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #C9A7FB;
+  --color-primary-hover: #B482FF;
+  --color-secondary: #E2E2E2;
+  --color-black: #000000;
+  --color-white: #FFFFFF;
+}
+
+@layer base {
+  html {
+    @apply text-black bg-white;
+    scrollbar-gutter: stable;
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply font-sans min-h-screen;
+  }
+}
+
+/* Reusable utility classes */
+@layer components {
+  .button-primary {
+    @apply bg-primary hover:bg-primaryHover text-black font-bold px-8 py-2 rounded-pill transition-colors;
+  }
+
+  .button-secondary {
+    @apply bg-secondary hover:bg-opacity-80 text-black font-bold px-8 py-2 rounded-pill transition-colors;
+  }
+
+  .heading-1 {
+    @apply text-7xl font-extrabold text-black;
+  }
+
+  .heading-2 {
+    @apply text-6xl font-bold text-black;
+  }
+
+  .heading-3 {
+    @apply text-4xl font-bold text-black;
+  }
+
+  .text-body {
+    @apply text-base text-black;
+  }
+
+  .nav-link {
+    @apply text-black hover:text-gray-600 transition-colors;
+  }
+}
+
+/* Hide scrollbar but keep functionality */
+.hide-scrollbar {
+  scrollbar-width: none;  /* Firefox */
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* WebKit */
+}
+
+/* Prevent content squeeze when scrollbar appears */
+.scrollbar-gutter-stable {
+  scrollbar-gutter: stable;
+  /* For Firefox */
+  scrollbar-width: thin;
+  /* For WebKit browsers */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+}
+
+/* Prevent scrollbar from causing layout shifts */
+* {
+  scrollbar-width: thin;
+}
+
+/* For Webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(155, 155, 155, 0.5);
+  border-radius: 20px;
+}
+
+/* Animation for state persistence indicator */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Matrix-style falling text animations - slower and less dizzying */
+@keyframes matrixFall {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes matrixFallDelayed {
+  0% {
+    transform: translateY(-120%);
+  }
+  100% {
+    transform: translateY(120%);
+  }
+}
+
+@keyframes matrixFallSlow {
+  0% {
+    transform: translateY(-140%);
+  }
+  100% {
+    transform: translateY(140%);
+  }
+}
+
+@keyframes matrixFallMedium {
+  0% {
+    transform: translateY(-90%);
+  }
+  100% {
+    transform: translateY(90%);
+  }
+}
+
+.animate-matrix-fall {
+  animation: matrixFall 12s linear infinite;
+}
+
+.animate-matrix-fall-delayed {
+  animation: matrixFallDelayed 35s linear infinite;
+  animation-delay: -8s;
+}
+
+.animate-matrix-fall-slow {
+  animation: matrixFallSlow 40s linear infinite;
+  animation-delay: -15s;
+}
+
+.animate-matrix-fall-medium {
+  animation: matrixFallMedium 25s linear infinite;
+}
+
+/* Slide up animation for bottom sheets */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Slide down animation for bottom sheets */
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+/* Always hide the browser's default date placeholder (mm/dd/yyyy) */
+.date-input-custom::-webkit-datetime-edit-text,
+.date-input-custom::-webkit-datetime-edit-month-field,
+.date-input-custom::-webkit-datetime-edit-day-field,
+.date-input-custom::-webkit-datetime-edit-year-field {
+  color: transparent;
+}
+
+/* Show the date when it has a value and is focused */
+.date-input-custom:focus::-webkit-datetime-edit-text,
+.date-input-custom:focus::-webkit-datetime-edit-month-field,
+.date-input-custom:focus::-webkit-datetime-edit-day-field,
+.date-input-custom:focus::-webkit-datetime-edit-year-field {
+  color: black;
+}
+
+/* Show the date value when input is valid (has a date selected) */
+.date-input-custom:valid::-webkit-datetime-edit-text,
+.date-input-custom:valid::-webkit-datetime-edit-month-field,
+.date-input-custom:valid::-webkit-datetime-edit-day-field,
+.date-input-custom:valid::-webkit-datetime-edit-year-field {
+  color: black;
+}
+
+.date-input-custom::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}

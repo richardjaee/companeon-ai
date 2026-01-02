@@ -1,0 +1,77 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js build output
+.next
+
+# Testing
+coverage
+.nyc_output
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+
+# Cache files
+.cache
+*.pack
+*.pack.old
+
+# IDE
+.vscode
+.idea
+
+# OS files
+Thumbs.db
+
+# Contracts (if not needed for deployment)
+contracts/artifacts
+contracts/cache
+
+# Additional exclusions to reduce file count
+*.log
+*.map
+.git
+.github
+docs/
+README.md
+*.md
+.env.example
+.gitignore
+yarn.lock
+.eslintrc*
+.prettierrc*
+tailwind.config.*
+
+# Large binary files from dependencies
+**/*.node
+**/*.dylib
+**/*.so
+**/*.dll
+**/sentry-cli
+**/@nomicfoundation/edr-*
+**/@img/sharp-*
+**/@next/swc-*
+
+# Additional cleanup files
+test-tar*
+*.tar.gz
+remove-all-console-logs.js
+find-unused.js
+CLEANUP.md
+instrumentation.ts

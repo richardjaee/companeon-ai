@@ -1,38 +1,127 @@
-# Companeon Agent Backend
+# Companeon
 
-Wallet-native AI agent backend that executes on-chain transactions through conversational prompts using ERC-7715 delegated permissions.
-
-Built with **Express** · **Google Gemini 2.5** · **ERC-7715** · **Envio HyperSync** · **Firestore**
+A wallet-native AI agent that turns conversational prompts into on-chain transactions using ERC-7715 Advanced Permissions and Envio HyperSync.
 
 ---
 
-## Quick Start
+## Overview
 
-1) Install
+Companeon lets you control your crypto wallet through natural language conversations. Instead of manually navigating multiple apps and approving each transaction, you grant ERC-7715 permissions once and let the AI agent handle the execution.
 
-```bash
-npm install
-```
+The agent operates within wallet-enforced spending limits (no custody, no vaults) and maintains a full audit trail via Envio's blockchain indexing.
 
-2) Configure
+**Example interactions:**
+- "Send 50 USDC to vitalik.eth"
+- "Swap 2 ETH to USDC using fast gas"
+- "What actions have you taken with my wallet this week?"
 
-- Copy `.env.example` to `.env` and set required values
+---
 
-3) Run
+## The Problem
 
-```bash
-npm run dev
-# or: npm start
-```
+Crypto wallet management requires users to navigate multiple apps, understand gas fees, and manually approve every transaction. Automation tools often require moving funds to new contracts or granting unlimited approvals, which introduces security risks.
 
-4) Check
+## Our Solution
 
-```bash
-curl http://localhost:${PORT:-8080}/health
-curl http://localhost:${PORT:-8080}/version
-```
+Users grant scoped, time-bound ERC-7715 permissions to an AI agent that can execute transactions directly from their wallet. Each permission specifies:
 
-Entry point: `server.js` (calls `src/index.js`).
+- Token type (ETH, USDC, etc.)
+- Spending limit per period (e.g., "1 ETH per day")
+- Expiration date
+- Instant revocability
+
+The agent handles routing, gas optimization, transaction simulation, and error recovery while staying within these on-chain limits. Envio indexes all delegated executions for a complete audit trail.
+
+---
+
+## Advanced Permissions Usage
+
+Companeon is built on ERC-7715 Advanced Permissions using MetaMask Smart Accounts Kit. All transactions execute via the DelegationManager with wallet-enforced spending limits.
+
+### Code Links
+
+**Requesting Permissions (Frontend)**
+
+Core implementation:
+- [`frontend/src/lib/smartAccount/grantPermissions.ts`](./frontend/src/lib/smartAccount/grantPermissions.ts) - Uses MetaMask Smart Accounts Kit to create ERC-7715 delegations with token-specific spending limits
+
+UI component:
+- [`frontend/src/components/GrantPermissionsModal/GrantPermissionsModal.tsx`](./frontend/src/components/GrantPermissionsModal/GrantPermissionsModal.tsx) - Multi-step modal for setting permissions (token selection, spending limits, time periods)
+
+**Redeeming Permissions (Backend)**
+
+Core implementation:
+- [`backend/src/lib/delegationSigner.js`](./backend/src/lib/delegationSigner.js) - `DelegationSigner` class wraps all transactions in `DelegationManager.redeemDelegations()`, routes ETH vs ERC-20 executions through correct permission contexts
+
+Permission-aware tools:
+- [`backend/src/tools/definitions/delegation.js`](./backend/src/tools/definitions/delegation.js) - Agent tools for querying live permission state (`check_delegation_limits`) and diagnosing enforcer errors (`diagnose_delegation_error`)
+
+### How It Works
+
+1. User grants permissions via MetaMask (frontend calls Smart Accounts Kit)
+2. Permission contexts stored in Firestore
+3. Backend retrieves contexts and wraps transactions in `DelegationManager.redeemDelegations()`
+4. On-chain enforcers validate spending limits before execution
+5. Agent queries remaining limits in real-time and explains failures in plain English
+
+Example agent behavior:
+- "You have 0.5 ETH remaining today. Your limit resets in 3 hours."
+- "This transfer exceeds your daily ETH limit. You can wait for the reset, reduce the amount, or extend your permission."
+
+---
+
+## Envio Usage
+
+Companeon integrates Envio HyperSync for blockchain indexing and wallet history queries. Instead of slow RPC polling, the agent uses HyperSync's `/query` endpoint (approximately 2000x faster) to retrieve on-chain data.
+
+### Code Links
+
+All Envio tools:
+- [`backend/src/tools/definitions/envio.js`](./backend/src/tools/definitions/envio.js) - Contains 7 agent-callable tools that wrap HyperSync queries
+
+### How We Use Envio
+
+Each tool represents one agent call that orchestrates HyperSync queries and returns structured wallet data:
+
+**1. `envio_get_token_transfers`**
+- Query: ERC-20 Transfer event logs
+- Returns: Token transfer history (sent + received)
+- Example: "Show my last 3 USDC transfers"
+
+**2. `envio_get_eth_transfers`**
+- Query: Native transaction logs
+- Returns: ETH transfer history
+- Example: "Show my ETH transfers"
+
+**3. `envio_get_all_transfers`**
+- Query: Parallel ETH + ERC-20 queries, merged by timestamp
+- Returns: Unified transfer timeline
+- Example: "Show all transfers in my wallet"
+
+**4. `envio_get_recent_activity`**
+- Query: Aggregated logs over time window
+- Returns: Activity summary (incoming, outgoing, net flow)
+- Example: "What happened in my wallet today?"
+
+**5. `envio_count_wallet_transactions`**
+- Query: Count-focused log queries
+- Returns: Transaction volume stats
+- Example: "How many transactions did I make this month?"
+
+**6. `envio_get_delegation_executions`**
+- Query: `RedeemedDelegation` event logs from MetaMask DelegationManager
+- Returns: When delegated permissions were used, whether executed by user or AI agent
+- Example: "What actions has the AI taken with my wallet?"
+- **This produces a verifiable on-chain audit trail of AI activity**
+
+**7. `envio_check_recipient`**
+- Query: Historical transfer lookups
+- Returns: First-time vs known address detection
+- Example: "Have I sent to this address before?"
+
+### Why Envio
+
+Envio turns blockchain history into agent memory. The agent can reason over live on-chain state and provide contextual responses instead of raw transaction logs.
 
 ---
 
@@ -49,37 +138,37 @@ User Prompt → Express API → Agent (ReAct Loop) → Tools → Blockchain
 
 ### Core Components
 
-#### 1. **Express API Server** (`src/index.js`)
+**1. Express API Server** ([`backend/src/index.js`](./backend/src/index.js))
 - RESTful + SSE streaming endpoints
 - Session management (Firestore)
 - Request authentication
 - Chain context management
 
-#### 2. **Agent (ReAct Loop)** (`src/agent/Agent.js`)
+**2. Agent (ReAct Loop)** ([`backend/src/agent/Agent.js`](./backend/src/agent/Agent.js))
 - Iterative reasoning loop: Think → Act → Observe
 - Tool selection and execution
 - Autonomous error recovery
 - Duplicate call prevention
 - Auto-diagnosis for delegation errors
 
-#### 3. **Tool Registry** (`src/tools/`)
-- **Wallet Tools**: Holdings, swaps, transfers
-- **DeFi Tools**: Uniswap integration, gas estimation
-- **Research Tools**: Perplexity search (x402), price data
-- **Security Tools**: GoPlus recipient verification, Envio transaction history
-- **Delegation Tools**: Limit checking, permission diagnosis
+**3. Tool Registry** ([`backend/src/tools/`](./backend/src/tools/))
+- Wallet Tools: Holdings, swaps, transfers
+- DeFi Tools: Uniswap integration, gas estimation
+- Research Tools: Perplexity search (x402), price data
+- Security Tools: GoPlus recipient verification, Envio transaction history
+- Delegation Tools: Limit checking, permission diagnosis
 
-#### 4. **LLM Client** (`src/llm/GeminiClient.js`)
+**4. LLM Client** ([`backend/src/llm/GeminiClient.js`](./backend/src/llm/GeminiClient.js))
 - Google Gemini 2.5 Flash integration
 - Native function calling
 - Streaming responses
 
-#### 5. **Delegation Signer** (`src/lib/delegationSigner.js`)
+**5. Delegation Signer** ([`backend/src/lib/delegationSigner.js`](./backend/src/lib/delegationSigner.js))
 - ERC-7715 transaction wrapping
 - MetaMask Smart Accounts Kit integration
 - Permission context management
 
-#### 6. **Session Store** (`src/memory/FirestoreSessionStore.js`)
+**6. Session Store** ([`backend/src/memory/FirestoreSessionStore.js`](./backend/src/memory/FirestoreSessionStore.js))
 - Persistent conversation history
 - Memory facts (wallet address, preferences)
 - Pending operation tracking
@@ -182,138 +271,9 @@ SSE Events:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/version` | GET | Service name and version |
 | `/metrics` | GET | Server metrics |
 | `/delegation/clear-cache` | POST | Clear delegation cache |
 | `/images/:id` | GET | Retrieve stored image |
-
----
-
-## ERC-7715 Delegation Flow
-
-### 1. Permission Grant (Frontend)
-
-```javascript
-// User grants permissions via MetaMask
-const delegation = await grantDelegation({
-  delegator: userWallet,    // User's wallet
-  delegate: backendKey,     // Backend signer
-  permissions: [
-    { token: 'ETH', limit: '0.1 ETH per day' },
-    { token: 'USDC', limit: '100 USDC per day' }
-  ]
-});
-
-// Store in Firestore
-POST /register-wallet-agent
-Body: { walletAddress, permissionsContext }
-```
-
-### 2. Transaction Execution (Backend)
-
-```javascript
-// Backend wraps tx in delegation
-const tx = {
-  to: USDC_ADDRESS,
-  data: transferData,  // transfer(recipient, amount)
-  value: 0n
-};
-
-// DelegationSigner wraps this in:
-DelegationManager.redeemDelegations(
-  [permissionsContext],  // User's delegation
-  [executionMode],       // Single call
-  [encodedExecution]     // The actual tx
-);
-
-// On-chain enforcement:
-// - DelegationManager checks spending limits
-// - Reverts if exceeded
-// - Updates spent amounts
-```
-
-### 3. Permission-Aware Tools
-
-**`check_delegation_limits`** - Query live on-chain permission state
-
-Uses MetaMask SDK methods:
-- `getNativeTokenPeriodTransferEnforcerAvailableAmount()` - ETH remaining
-- `getErc20PeriodTransferEnforcerAvailableAmount()` - ERC-20 remaining
-- `decodeExpirationFromDelegation()` - Expiry date
-
-Returns:
-```json
-{
-  "eth": {
-    "available": "0.5 ETH",
-    "resetsIn": "3 hours",
-    "expiresAt": "2025-02-01"
-  },
-  "usdc": {
-    "available": "50 USDC",
-    "resetsIn": "1 day",
-    "expiresAt": "2025-02-01"
-  }
-}
-```
-
-**`diagnose_delegation_error`** - Parse revert messages
-
-Translates enforcer errors:
-- `NativeTokenPeriodTransferEnforcer:transfer-amount-exceeded`
-- `ERC20PeriodTransferEnforcer:transfer-amount-exceeded`
-- Timestamp expiration failures
-
-Into plain English:
-```
-"This transfer exceeds your daily ETH limit.
-You can wait for the reset, reduce the amount, or extend your permission."
-```
-
-### 4. Error Recovery
-
-If delegation fails:
-1. Agent auto-calls `diagnose_delegation_error`
-2. Checks current limits vs. requested amount
-3. Explains to user what happened
-4. Suggests: reduce amount, wait for reset, or grant new permissions
-
----
-
-## Envio Integration
-
-### HyperSync Query Endpoint
-
-All Envio tools use:
-```
-POST https://sepolia.hypersync.xyz/query
-```
-
-~2000× faster than standard RPC polling.
-
-### Envio-Wrapped Agent Tools
-
-| Tool | Query Type | Purpose |
-|------|------------|---------|
-| `envio_get_token_transfers` | ERC-20 Transfer logs | Token transfer history |
-| `envio_get_eth_transfers` | Native transactions | ETH transfer history |
-| `envio_get_all_transfers` | Parallel ETH + ERC-20 | Unified transfer timeline |
-| `envio_get_recent_activity` | Aggregated logs | Wallet activity summary |
-| `envio_count_wallet_transactions` | Count-focused queries | Transaction volume stats |
-| `envio_get_delegation_executions` | RedeemedDelegation events | AI action audit trail |
-| `envio_check_recipient` | Historical lookups | First-time vs known address |
-
-**Example: `envio_get_delegation_executions`**
-
-Tracks all ERC-7715 delegated executions:
-- When permissions were used
-- Who executed (user vs AI agent)
-- What was executed
-- On-chain verification via RedeemedDelegation events
-
-Enables queries like:
-- *"What actions has the AI taken with my wallet?"*
-- *"Show delegated transactions this week"*
 
 ---
 
@@ -362,11 +322,11 @@ Enables queries like:
 
 ## Environment Variables
 
-### Required
+### Backend (Required)
 
 ```bash
 # LLM Configuration (choose one)
-GOOGLE_GENAI_API_KEY=        # Google AI Studio key (easiest)
+GOOGLE_GENAI_API_KEY=        # Google AI Studio key
 # OR
 GOOGLE_CLOUD_PROJECT=        # GCP project for Vertex AI
 VERTEX_LOCATION=us-central1
@@ -381,7 +341,7 @@ CHAIN_ID=8453
 GOOGLE_CLOUD_PROJECT=        # For session storage
 ```
 
-### Optional
+### Backend (Optional)
 
 ```bash
 # External APIs
@@ -403,84 +363,139 @@ TIMEOUT_MODEL_MS=30000
 MAX_AGENT_ITERATIONS=10
 ```
 
+### Frontend
+
+```bash
+# Backend API
+NEXT_PUBLIC_BACKEND_URL=http://localhost:8080
+
+# Chain Configuration
+NEXT_PUBLIC_DEFAULT_CHAIN_ID=8453  # Base
+NEXT_PUBLIC_RPC_URL=https://mainnet.base.org
+
+# WalletConnect (optional)
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
+
+# Sentry (optional)
+NEXT_PUBLIC_SENTRY_DSN=
+```
+
 ---
 
-## Installation
+## Installation & Setup
 
 ### Prerequisites
 - Node.js 18+
 - Google Cloud Project (for Firestore + Gemini)
-- Private key for delegation signing
+- MetaMask Flask or compatible ERC-7715 wallet
 
-### Setup
+### Backend Setup
 
 ```bash
-# 1. Install dependencies
+cd backend
 npm install
-
-# 2. Configure environment
 cp .env.example .env
 # Edit .env with your keys
-
-# 3. Set up Firestore
-# Create collections: sessions, UserWallets
-
-# 4. Run locally
 npm run dev
 
 # Server starts on http://localhost:8080
 ```
 
----
-
-## Deployment
-
-### Google Cloud Run
+### Frontend Setup
 
 ```bash
-# Build container
-docker build -t companeon-agent .
+cd frontend
+npm install
+cp .env.example .env.local
+# Edit .env.local with your keys
+npm run dev
 
-# Push to GCR
-docker tag companeon-agent gcr.io/PROJECT_ID/companeon-agent
-docker push gcr.io/PROJECT_ID/companeon-agent
-
-# Deploy
-gcloud run deploy companeon-agent \
-  --image gcr.io/PROJECT_ID/companeon-agent \
-  --platform managed \
-  --region us-central1 \
-  --set-env-vars="GOOGLE_GENAI_API_KEY=..." \
-  --set-env-vars="BACKEND_DELEGATION_KEY=..." \
-  --set-env-vars="RPC_URL=https://mainnet.base.org"
+# Open http://localhost:3000
 ```
 
-### Required Permissions
-- Firestore read/write
-- KMS decrypt (if using encrypted keys)
-- Cloud Run execute
+---
+
+## Project Structure
+
+```
+companeon-ai/
+├── README.md
+├── backend/
+│   ├── src/
+│   │   ├── index.js                 # Express server
+│   │   ├── agent/
+│   │   │   ├── Agent.js            # ReAct loop
+│   │   │   └── wallet-prompts.js   # System prompts
+│   │   ├── llm/
+│   │   │   └── GeminiClient.js     # LLM integration
+│   │   ├── tools/
+│   │   │   ├── ToolRegistry.js     # Tool management
+│   │   │   └── definitions/
+│   │   │       ├── wallet-*.js     # Wallet tools
+│   │   │       ├── delegation.js   # Permission tools
+│   │   │       ├── envio.js        # Envio history tools
+│   │   │       └── research.js     # x402 tools
+│   │   ├── lib/
+│   │   │   ├── delegationSigner.js # ERC-7715 signer
+│   │   │   ├── chainConfig.js      # Multi-chain config
+│   │   │   └── signer.js           # Signer driver
+│   │   └── memory/
+│   │       └── FirestoreSessionStore.js
+│   ├── package.json
+│   └── .env.example
+│
+└── frontend/
+    ├── src/
+    │   ├── app/                    # Next.js App Router
+    │   │   ├── [chain]/           # Chain-specific routes
+    │   │   └── layout.tsx         # Root layout
+    │   ├── components/
+    │   │   ├── Chat/              # AI chat interface
+    │   │   ├── Dashboard/         # Portfolio & permissions UI
+    │   │   ├── GrantPermissionsModal/ # ERC-7715 grant UI
+    │   │   └── shared/            # Reusable components
+    │   ├── lib/
+    │   │   ├── smartAccount/
+    │   │   │   └── grantPermissions.ts # ERC-7715 grant logic
+    │   │   ├── wallets/           # Wallet providers
+    │   │   └── api/               # Backend API client
+    │   ├── hooks/                 # React hooks
+    │   └── context/               # React context providers
+    ├── package.json
+    └── .env.example
+```
+
+---
+
+## Tech Stack
+
+**Frontend:** Next.js 14, TypeScript, Tailwind CSS, MetaMask Smart Accounts Kit
+
+**Backend:** Node.js, Express, Google Gemini 2.5 Flash, ethers.js, viem
+
+**Infrastructure:** Envio HyperSync, Cloud Firestore, Uniswap V4
 
 ---
 
 ## Safety Features
 
-### Spending Limits
+**Spending Limits**
 - Enforced on-chain via ERC-7715
 - Daily/hourly reset periods
 - Per-token limits
 
-### Duplicate Prevention
+**Duplicate Prevention**
 - Tracks write operations (swaps, transfers)
 - Blocks identical parallel calls
 - Allows different operations (multi-swap)
 
-### Confirmation Modes
+**Confirmation Modes**
 ```javascript
 autoTxMode: 'ask'   // Requires user approval (default)
 autoTxMode: 'auto'  // Executes immediately
 ```
 
-### Error Recovery
+**Error Recovery**
 - Automatic retry with exponential backoff
 - Smart error categorization
 - Recovery suggestions for LLM
@@ -488,92 +503,31 @@ autoTxMode: 'auto'  // Executes immediately
 
 ---
 
-## Project Structure
+## Deployment
 
-```
-backend/
-├── src/
-│   ├── index.js                 # Express server
-│   ├── agent/
-│   │   ├── Agent.js            # ReAct loop
-│   │   └── wallet-prompts.js   # System prompts
-│   ├── llm/
-│   │   └── GeminiClient.js     # LLM integration
-│   ├── tools/
-│   │   ├── ToolRegistry.js     # Tool management
-│   │   └── definitions/        # Tool implementations
-│   │       ├── wallet-*.js     # Wallet tools
-│   │       ├── delegation.js   # Permission tools
-│   │       ├── research.js     # x402 tools
-│   │       ├── envio.js        # Envio history tools
-│   │       └── ...
-│   ├── lib/
-│   │   ├── delegationSigner.js # ERC-7715 signer
-│   │   ├── chainConfig.js      # Multi-chain config
-│   │   └── signer.js           # Signer driver
-│   ├── memory/
-│   │   └── FirestoreSessionStore.js
-│   └── config/
-│       └── runtime.js
-├── .env.example
-├── package.json
-└── README.md
-```
+### Google Cloud Run (Backend)
 
----
-
-## Key Technologies
-
-| Component | Technology | Purpose |
-|-----------|-----------|------------|
-| **Runtime** | Node.js + Express | API server |
-| **LLM** | Google Gemini 2.5 Flash | Reasoning & tool calling |
-| **Blockchain** | ethers.js + viem | Web3 interactions |
-| **Delegation** | MetaMask Smart Accounts Kit | ERC-7715 permissions |
-| **Storage** | Cloud Firestore | Sessions & memory |
-| **Indexer** | Envio HyperSync | Blockchain history queries |
-| **Schema** | Zod | Input validation |
-| **Logging** | Winston | Structured logs |
-| **DEX** | Uniswap V4 | Token swaps |
-
----
-
-## Development
-
-### Run Tests
 ```bash
-npm test
+cd backend
+docker build -t companeon-backend .
+docker tag companeon-backend gcr.io/PROJECT_ID/companeon-backend
+docker push gcr.io/PROJECT_ID/companeon-backend
+
+gcloud run deploy companeon-backend \
+  --image gcr.io/PROJECT_ID/companeon-backend \
+  --platform managed \
+  --region us-central1 \
+  --set-env-vars="GOOGLE_GENAI_API_KEY=..." \
+  --set-env-vars="BACKEND_DELEGATION_KEY=..." \
+  --set-env-vars="RPC_URL=https://mainnet.base.org"
 ```
 
-### Debug Mode
+### Vercel (Frontend)
+
 ```bash
-LOG_LEVEL=debug npm run dev
+cd frontend
+vercel
 ```
-
-### Clear Session Cache
-```bash
-curl -X POST http://localhost:8080/delegation/clear-cache
-```
-
----
-
-## Troubleshooting
-
-### "Delegation limit exceeded"
-- Check current limits: `check_delegation_limits` tool
-- Wait for daily reset, or grant new permissions
-
-### "RPC URL not configured"
-- Set `RPC_URL` in `.env`
-- Verify chain ID matches network
-
-### "Firestore initialization failed"
-- Set `GOOGLE_CLOUD_PROJECT`
-- Verify service account permissions
-
-### "Tool timeout"
-- Increase `TIMEOUT_TOOL_MS` for slow operations
-- Check RPC provider status
 
 ---
 
@@ -581,14 +535,8 @@ curl -X POST http://localhost:8080/delegation/clear-cache
 
 Apache License 2.0 with Commons Clause
 
-This project is free for personal, educational, and non-commercial use. You may not use this software to provide commercial services. For commercial licensing inquiries, please contact the Companeon team.
+Free for personal, educational, and non-commercial use. Commercial use requires licensing.
 
 ---
 
-## Resources
-
-- [ERC-7715 Spec](https://eips.ethereum.org/EIPS/eip-7715)
-- [MetaMask Smart Accounts Kit](https://docs.metamask.io/smart-accounts-kit/)
-- [Google Gemini API](https://ai.google.dev/gemini-api/docs)
-- [Uniswap V4 Docs](https://docs.uniswap.org/)
-- [Envio HyperSync](https://docs.envio.dev/docs/HyperSync/overview)
+Built for MetaMask Advanced Permissions Hackathon 2025
