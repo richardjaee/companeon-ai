@@ -57,14 +57,14 @@ function crawl(root) {
 
 function main() {
   if (process.argv.length < 3) {
-    console.error('Usage: node scripts/list-deps.js <root-file>');
+    
     process.exit(1);
   }
   const root = path.resolve(process.argv[2]);
   const visited = crawl(root);
   const list = Array.from(visited).sort();
-  console.log(`Dependencies reachable from ${path.relative(process.cwd(), root)} (count=${list.length}):`);
-  for (const f of list) console.log(' -', path.relative(process.cwd(), f));
+  
+  for (const f of list) ;
 }
 
 main();

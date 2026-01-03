@@ -186,7 +186,7 @@ export function getChainConfig(chainId = null) {
   const effectiveChainId = getChainId(chainId);
   const config = CHAINS[effectiveChainId];
   if (!config) {
-    console.warn(`Unknown chain ${effectiveChainId}, falling back to Base`);
+    
     return CHAINS[8453];
   }
   return config;

@@ -10,7 +10,7 @@ export async function isMetaMaskFlask(ethereum: any): Promise<boolean> {
 
     // Newer Flask builds expose an explicit flag
     if (ethereum.isMetaMaskFlask) {
-      console.log('[detectFlask] ✅ Flask detected via isMetaMaskFlask flag');
+      
       return true;
     }
 
@@ -18,14 +18,14 @@ export async function isMetaMaskFlask(ethereum: any): Promise<boolean> {
     if (version && typeof version === 'string') {
       const lowered = version.toLowerCase();
       if (lowered.includes('flask')) {
-        console.log('[detectFlask] ✅ Flask detected in version string:', version);
+        
         return true;
       }
 
       // Some builds omit "flask" but follow semver >= 13.5.0 for Flask-only features
       const majorMinor = parseFloat(version);
       if (!Number.isNaN(majorMinor) && majorMinor >= 13.5) {
-        console.log('[detectFlask] ✅ Flask detected via version >= 13.5:', version);
+        
         return true;
       }
     }
@@ -35,18 +35,18 @@ export async function isMetaMaskFlask(ethereum: any): Promise<boolean> {
     try {
       const hasPermissions = await supportsAdvancedPermissions(ethereum);
       if (hasPermissions) {
-        console.log('[detectFlask] ✅ Flask detected via wallet_getCapabilities');
+        
         return true;
       }
     } catch (e) {
       // Capabilities check failed - that's OK, we have other detection methods
-      console.log('[detectFlask] wallet_getCapabilities check skipped (not an error)');
+      
     }
 
-    console.log('[detectFlask] ❌ Flask not detected');
+    
     return false;
   } catch (error) {
-    console.error('[detectFlask] Error detecting Flask:', error);
+    
     return false;
   }
 }
@@ -63,7 +63,7 @@ export async function supportsAdvancedPermissions(ethereum: any): Promise<boolea
 
     // If no accounts connected, can't check capabilities
     if (!accounts || !Array.isArray(accounts) || accounts.length === 0 || !accounts[0]) {
-      console.log('[detectFlask] No connected accounts, cannot check capabilities');
+      
       return false;
     }
 
@@ -85,7 +85,7 @@ export async function supportsAdvancedPermissions(ethereum: any): Promise<boolea
     return false;
   } catch (error) {
     // Capability probe not supported; just treat as not available
-    console.log('[detectFlask] wallet_getCapabilities error:', error);
+    
     return false;
   }
 }

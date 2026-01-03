@@ -42,8 +42,7 @@ export async function createSmartAccountWithPermissions(
   }
 
   try {
-    console.log('[SmartAccount] Forcing Sepolia for ERC-7715 (only supported chain)');
-
+    
     // Step 1: Switch to Sepolia FIRST before any other operations
     // This is critical because wallet_getCapabilities and other RPC calls
     // may behave differently on different chains
@@ -51,13 +50,13 @@ export async function createSmartAccountWithPermissions(
     const currentChainNumber = parseInt(currentChainId, 16);
 
     if (currentChainNumber !== 11155111) {
-      console.log(`[SmartAccount] Wallet on chain ${currentChainNumber}, switching to Sepolia...`);
+      
       try {
         await ethereum.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: '0xaa36a7' }], // Sepolia
         });
-        console.log('[SmartAccount] Switched to Sepolia');
+        
       } catch (switchError: any) {
         if (switchError.code === 4902) {
           await ethereum.request({
@@ -111,11 +110,7 @@ export async function createSmartAccountWithPermissions(
     if (!hasNativeTokenPermission) {
       // Default: Allow 0.1 ETH per day for gas fees and small transactions
       const defaultNativeAmount = parseUnits('0.1', 18);
-      console.log('[ERC-7715] Adding default native token permission (required for enforcer chain):', {
-        periodAmount: defaultNativeAmount.toString(),
-        reason: 'Native token enforcer runs on ALL transactions, including ERC-20 transfers'
-      });
-
+      
       erc7715Permissions.push({
         chainId: 11155111, // Sepolia only for ERC-7715
         expiry: defaultExpiry,
@@ -172,16 +167,7 @@ export async function createSmartAccountWithPermissions(
       // Get frequency label for justification
       const frequencyLabel = perm.frequency || 'daily';
 
-      console.log(`[ERC-7715] Setting up ${isNativeToken ? 'native' : 'ERC-20'} periodic permission:`, {
-        token: perm.asset,
-        limit: perm.dailyLimit,
-        periodAmount: periodAmount.toString(),
-        periodDuration,
-        frequency: frequencyLabel,
-        expiry: new Date(expiry * 1000).toISOString(),
-        startTime: perm.startTime ? new Date(perm.startTime * 1000).toISOString() : 'now'
-      });
-
+      
       if (isNativeToken) {
         // Native token (ETH) periodic permission
         erc7715Permissions.push({
@@ -228,20 +214,14 @@ export async function createSmartAccountWithPermissions(
       throw new Error('No valid spending limit permissions found');
     }
 
-    console.log(`[ERC-7715] Total permissions to request: ${erc7715Permissions.length} (including native token for enforcer chain)`);
-    console.log('[ERC-7715] Permission types:', erc7715Permissions.map(p => p.permission.type));
-
+    
+    
     // Step 4: Request execution permissions using SDK method
     // This is the proper ERC-7715 flow - MetaMask will create a smart account if needed
-    console.log('[ERC-7715] Requesting execution permissions with:', {
-      permissions: erc7715Permissions,
-      delegate: delegateAddress,
-    });
-
+    
     const grantedPermissions = await walletClient.requestExecutionPermissions(erc7715Permissions as any);
 
-    console.log('[ERC-7715] Permission grant result (FULL):', JSON.stringify(grantedPermissions, null, 2));
-
+    
     // Step 5: Extract smart account address from result
     // The first granted permission should contain the account info
     const firstPermission = grantedPermissions[0];
@@ -249,8 +229,7 @@ export async function createSmartAccountWithPermissions(
       throw new Error('No permissions granted');
     }
 
-    console.log('[ERC-7715] First permission object:', JSON.stringify(firstPermission, null, 2));
-
+    
     // The userOpBuilder address is the smart account address that will execute operations
     // If not available, we'll need to compute it from the user's EOA
     const smartAccountAddress = firstPermission.signerMeta?.userOpBuilder || ownerAddress as Address;
@@ -268,10 +247,10 @@ export async function createSmartAccountWithPermissions(
       
       if (permType === 'native-token-periodic') {
         allPermissionContexts['native'] = perm.context;
-        console.log('[ERC-7715] ✅ Native token context:', perm.context?.slice(0, 40) + '...');
+        
       } else if (permType === 'erc20-token-periodic' && tokenAddress) {
         allPermissionContexts[tokenAddress.toLowerCase()] = perm.context;
-        console.log('[ERC-7715] ✅ ERC-20 token context for', tokenAddress, ':', perm.context?.slice(0, 40) + '...');
+        
       }
     }
 
@@ -279,9 +258,8 @@ export async function createSmartAccountWithPermissions(
     // But include ALL contexts so backend can use the right one per token
     const permissionsContext = firstPermission.context;
     
-    console.log('[ERC-7715] All permission contexts:', Object.keys(allPermissionContexts));
-    console.log('[ERC-7715] Delegation manager:', delegationManager);
-
+    
+    
     return {
       smartAccountAddress,
       permissionsContext, // Primary context (for backward compatibility)
@@ -292,8 +270,7 @@ export async function createSmartAccountWithPermissions(
       delegateAddress,
     };
   } catch (error: any) {
-    console.error('Smart account creation failed:', error);
-
+    
     // Handle user rejection
     if (error.code === 4001 || error.code === 'ACTION_REJECTED') {
       throw new Error('User rejected smart account creation');
@@ -333,7 +310,7 @@ export async function checkSmartAccountUpgrade(ethereum: any, address: string): 
 
     return result?.isSmartAccount || false;
   } catch (error) {
-    console.error('Failed to check smart account upgrade:', error);
+    
     return false;
   }
 }
@@ -350,7 +327,7 @@ export async function isSmartAccountSupported(ethereum: any): Promise<boolean> {
 
     // If no accounts connected, can't check capabilities
     if (!accounts || !Array.isArray(accounts) || accounts.length === 0 || !accounts[0]) {
-      console.log('[SmartAccount] No connected accounts, cannot check support');
+      
       return false;
     }
 
@@ -366,7 +343,7 @@ export async function isSmartAccountSupported(ethereum: any): Promise<boolean> {
 
     return capabilities?.permissions?.supported === true;
   } catch (error) {
-    console.error('Failed to check smart account support:', error);
+    
     // Fallback: assume supported for Base
     return true;
   }
@@ -425,11 +402,10 @@ export async function executeTradeWithERC7715Redemption(
   agentControllerAddress: string,
   executeAgentSwapCalldata: string
 ): Promise<string> {
-  console.log('[ERC-7715] 🔐 REDEEMING permissions using official SDK method...');
-  console.log('[ERC-7715] Delegation manager validating limits:', delegationManager);
-  console.log('[ERC-7715] Permissions context:', permissionsContext);
-  console.log('[ERC-7715] Target AgentController:', agentControllerAddress);
-
+  
+  
+  
+  
   try {
     // OFFICIAL META MASK SDK METHOD: sendTransactionWithDelegation
     // This internally calls DelegationManager.redeemDelegations()
@@ -440,14 +416,13 @@ export async function executeTradeWithERC7715Redemption(
       delegationManager               // Contract that validates limits
     });
 
-    console.log('[ERC-7715] ✅ Permission redeemed, limits validated, trade executed:', hash);
-    console.log('[ERC-7715] 🔒 Official SDK method used - strictly following MetaMask docs');
-
+    
+    
     return hash;
 
   } catch (error: any) {
-    console.error('[ERC-7715] ❌ Permission redemption failed - limits exceeded or invalid');
-    console.error('[ERC-7715] Official SDK method confirms ERC-7715 limits are enforced!');
+    
+    
     throw new Error(error.message || 'ERC-7715 limit exceeded - trade blocked');
   }
 }
