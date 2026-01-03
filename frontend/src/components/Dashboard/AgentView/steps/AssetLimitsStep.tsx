@@ -240,13 +240,13 @@ export default function AssetLimitsStep({
 
             // Check if start date is after end date
             if (p.endTime && timestamp > p.endTime) {
-              console.warn('[Start Date] Start date cannot be after end date');
+              
               updates._dateError = 'Start date cannot be after end date';
             } else {
               updates._dateError = undefined;
             }
           } else {
-            console.warn('[Start Date] Invalid date:', dateString);
+            
             updates.startTime = undefined;
             updates._dateError = 'Invalid date';
           }
@@ -285,13 +285,13 @@ export default function AssetLimitsStep({
 
             // Check if end date is before start date
             if (p.startTime && timestamp < p.startTime) {
-              console.warn('[End Date] End date cannot be before start date');
+              
               updates._dateError = 'End date cannot be before start date';
             } else {
               updates._dateError = undefined;
             }
           } else {
-            console.warn('[End Date] Invalid date:', dateString);
+            
             updates.endTime = undefined;
             updates._dateError = 'Invalid date';
           }
@@ -565,13 +565,13 @@ export default function AssetLimitsStep({
                                 type="date"
                                 value=""
                                 onChange={(e) => {
-                                  console.log('[Start Date] Asset:', asset.symbol, 'Selected value:', e.target.value);
+                                  
                                   if (e.target.value) {
                                     // Parse date string directly to avoid timezone issues
                                     const parts = e.target.value.split('-');
                                     if (parts.length === 3) {
                                       const [year, month, day] = parts;
-                                      console.log('[Start Date] Parsed:', { year, month, day, asset: asset.symbol });
+                                      
                                       handleStartDateInput(asset.address, `${month}${day}${year}`);
                                     }
                                   }
@@ -580,7 +580,7 @@ export default function AssetLimitsStep({
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  console.log('[Start Date] Clicked for asset:', asset.symbol);
+                                  
                                 }}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                               />
@@ -628,13 +628,13 @@ export default function AssetLimitsStep({
                                 type="date"
                                 value=""
                                 onChange={(e) => {
-                                  console.log('[End Date] Asset:', asset.symbol, 'Selected value:', e.target.value);
+                                  
                                   if (e.target.value) {
                                     // Parse date string directly to avoid timezone issues
                                     const parts = e.target.value.split('-');
                                     if (parts.length === 3) {
                                       const [year, month, day] = parts;
-                                      console.log('[End Date] Parsed:', { year, month, day, asset: asset.symbol });
+                                      
                                       handleEndDateInput(asset.address, `${month}${day}${year}`);
                                     }
                                   }
@@ -643,7 +643,7 @@ export default function AssetLimitsStep({
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  console.log('[End Date] Clicked for asset:', asset.symbol);
+                                  
                                 }}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                               />

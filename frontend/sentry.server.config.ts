@@ -31,7 +31,7 @@ Sentry.init({
     for (const pattern of attackPatterns) {
       if (pattern.test(errorMessage) || pattern.test(errorType)) {
         // This is a blocked attack attempt, don't log to Sentry
-        console.log('🛡️  Blocked attack attempt (not logged to Sentry):', errorMessage.substring(0, 100));
+        
         return null;
       }
     }

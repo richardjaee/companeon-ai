@@ -18,18 +18,17 @@ export default async function handler(
   // Default is often 10-30 seconds - we need 5+ minutes for blockchain txs
   if (req.socket) {
     req.socket.setTimeout(5 * 60 * 1000); // 5 minutes
-    console.log('[AgentStream] ⏰ Socket timeout set to 5 minutes');
+    
   }
   if (res.socket) {
     res.socket.setTimeout(5 * 60 * 1000); // 5 minutes
   }
 
   // 🚀🚀🚀 DEPLOYMENT VERIFICATION v3.0.0 - OPTIONS + ESP DEBUG LOGS 🚀🚀🚀
-  console.log('🔥🔥🔥 [PROXY v3.0.0] OPTIONS HANDLING + ESP GATEWAY DEBUG DEPLOYED! 🔥🔥🔥');
-
+  
   // ✅ Handle OPTIONS requests locally (don't forward to agent)
   if (req.method === 'OPTIONS') {
-    console.log('[Proxy] 🔄 OPTIONS request - handling locally');
+    
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-api-key');
@@ -37,10 +36,9 @@ export default async function handler(
   }
 
   // 🔥 ESP GATEWAY DEBUG - What is ESP actually sending?
-  console.log('[ESP->Proxy] 📡 Method:', req.method);
-  console.log('[ESP->Proxy] 📋 Content-Type:', req.headers['content-type']);
-  console.log('[ESP->Proxy] 📦 All headers:', JSON.stringify(req.headers, null, 2));
-
+  
+  
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
@@ -49,23 +47,14 @@ export default async function handler(
     // Parse body manually since bodyParser is disabled
     const rawBody = await getRawBody(req);
     const bodyStr = rawBody.toString();
-    console.log('[Proxy] 📥 Raw body received:', bodyStr);
-
+    
     const body = JSON.parse(bodyStr);
-    console.log('[Proxy] 📦 Parsed body:', JSON.stringify(body, null, 2));
-
+    
     const { walletAddress, agentSessionId, prompt, tokenId, controls } = body;
 
-    console.log('[Proxy] 🔍 Extracted values:', {
-      agentSessionId,
-      prompt,
-      walletAddress,
-      tokenId,
-      controls
-    });
-
+    
     if (!agentSessionId || !prompt) {
-      console.error('[Proxy] ❌ VALIDATION FAILED - Missing required fields!');
+      
       return res.status(400).json({ error: 'agentSessionId and prompt required' });
     }
 
@@ -74,23 +63,12 @@ export default async function handler(
     const INTERNAL_KEY = process.env.API_KEY;
 
     if (!upstreamUrl || !INTERNAL_KEY) {
-      console.error('[AgentStream] Missing environment variables:', {
-        hasUpstreamUrl: !!upstreamUrl,
-        hasInternalKey: !!INTERNAL_KEY
-      });
+      
       return res.status(500).json({ error: 'Server configuration error' });
     }
 
-    console.log('[AgentStream] 🚀 Starting stream:', {
-      walletAddress,
-      agentSessionId,
-      promptLength: prompt.length,
-      tokenId,
-      controls,
-      upstreamUrl
-    });
-    console.log('[Proxy -> Agent] Body keys:', Object.keys(body));
-
+    
+    
     // ✅ Set SSE headers BEFORE making upstream request
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -103,8 +81,7 @@ export default async function handler(
     }
 
     // Make request to backend streaming endpoint
-    console.log('[AgentStream] 📡 Upstream URL:', upstreamUrl);
-
+    
     // Build the body exactly as specified by backend AI
     const bodyToSend = JSON.stringify({
       agentSessionId,
@@ -127,12 +104,11 @@ export default async function handler(
       'x-api-key': INTERNAL_KEY
     };
 
-    console.log('[Proxy -> Agent] 📤 Body:', bodyToSend);
-    console.log('[Proxy -> Agent] 📋 Headers:', outboundHeaders);
-    console.log('[Proxy -> Agent] 📡 URL:', upstreamUrl);
-    console.log('[Proxy -> Agent] 🔑 Body keys:', Object.keys(JSON.parse(bodyToSend)));
-    console.log('[Proxy -> Agent] 🎯 Content-Type being sent:', outboundHeaders['Content-Type']);
-
+    
+    
+    
+    
+    
     const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: outboundHeaders,
@@ -141,12 +117,7 @@ export default async function handler(
 
     if (!upstream.ok || !upstream.body) {
       const text = await upstream.text().catch(() => '');
-      console.error('[AgentStream] ❌ Upstream failed:', {
-        status: upstream.status,
-        statusText: upstream.statusText,
-        body: text
-      });
-
+      
       res.write(`data: ${JSON.stringify({
         type: 'error',
         message: text || 'upstream failed'
@@ -154,10 +125,9 @@ export default async function handler(
       return res.end();
     }
 
-    console.log('[AgentStream] ✅ Upstream connected, streaming...');
-    console.log('[AgentStream] 📊 Upstream status:', upstream.status);
-    console.log('[AgentStream] 📋 Upstream headers:', Object.fromEntries(upstream.headers.entries()));
-
+    
+    
+    
     // ✅ Stream response verbatim - DO NOT BUFFER
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
@@ -172,7 +142,7 @@ export default async function handler(
       if (silenceMs > HEARTBEAT_INTERVAL - 1000) {
         // Send SSE comment as heartbeat (clients ignore lines starting with :)
         res.write(': heartbeat\n\n');
-        console.log('[AgentStream] 💓 Heartbeat sent (silence:', Math.round(silenceMs / 1000), 's)');
+        
       }
     }, HEARTBEAT_INTERVAL);
 
@@ -183,11 +153,7 @@ export default async function handler(
         const { value, done } = await reader.read();
 
         if (done) {
-          console.log('[AgentStream] 🔚 Stream ended by backend:', {
-            totalChunks: chunkCount,
-            lastEventType,
-            durationMs: Date.now() - lastDataTime
-          });
+          
           break;
         }
 
@@ -205,21 +171,20 @@ export default async function handler(
             const event = JSON.parse(eventMatch[1]);
             lastEventType = event.type;
             if (chunkCount <= 10 || event.type === 'generated_image' || event.type === 'done' || event.type === 'ask') {
-              console.log('[AgentStream] 📨 Event #' + chunkCount + ':', event.type);
+              
             }
           } catch {}
         }
       }
     } catch (streamError) {
-      console.error('[AgentStream] ❌ Stream error:', streamError);
+      
     } finally {
       clearInterval(heartbeatInterval); // ✅ Clean up heartbeat
       res.end();
-      console.log('[AgentStream] 🏁 Connection closed');
+      
     }
   } catch (error) {
-    console.error('[AgentStream] ❌ Handler error:', error);
-
+    
     if (!res.headersSent) {
       res.status(500).json({
         error: 'Stream initialization failed',

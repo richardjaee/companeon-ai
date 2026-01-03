@@ -39,13 +39,13 @@ async function switchToSepolia(ethereum: any): Promise<void> {
   const currentChainNumber = parseInt(currentChainId, 16);
 
   if (currentChainNumber !== 11155111) {
-    console.log(`[GrantPermissions] Wallet on chain ${currentChainNumber}, switching to Sepolia...`);
+    
     try {
       await ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: '0xaa36a7' }], // Sepolia
       });
-      console.log('[GrantPermissions] Switched to Sepolia');
+      
     } catch (switchError: any) {
       if (switchError.code === 4902) {
         await ethereum.request({
@@ -81,9 +81,9 @@ export async function grantERC7715Permissions(
   // Step 2: Check Flask
   const hasFlask = await isMetaMaskFlask(ethereum);
   if (!hasFlask) {
-    console.warn('[GrantPermissions] Flask detection returned false, but proceeding anyway');
+    
   } else {
-    console.log('[GrantPermissions] Flask detected successfully');
+    
   }
 
   // Step 3: Get backend delegation address
@@ -98,7 +98,7 @@ export async function grantERC7715Permissions(
     transport: custom(ethereum),
   }).extend(erc7715ProviderActions());
 
-  // Step 5: Build ERC-7715 permissions array (ERC-7715 format)
+  // Step 5: Build ERC-7715 permissions array ()
   const currentTime = Math.floor(Date.now() / 1000);
   const expiry = currentTime + (30 * 24 * 60 * 60); // 30 days
 
@@ -109,12 +109,7 @@ export async function grantERC7715Permissions(
       // Native ETH: periodAmount is in wei, convert to BigInt
       const periodAmountBigInt = BigInt(scope.periodAmount || '0');
 
-      console.log('[ERC-7715] Adding native token permission:', {
-        periodAmount: periodAmountBigInt.toString(),
-        periodAmountFormatted: scope.periodAmountFormatted,
-        periodDuration: scope.periodDuration,
-      });
-
+      
       erc7715Permissions.push({
         chainId: 11155111, // Sepolia
         expiry,
@@ -136,14 +131,7 @@ export async function grantERC7715Permissions(
       // ERC20: periodAmount is in smallest unit (e.g., USDC with 6 decimals)
       const periodAmountBigInt = BigInt(scope.periodAmount || '0');
 
-      console.log('[ERC-7715] Adding ERC20 token permission:', {
-        tokenAddress: scope.tokenAddress,
-        tokenSymbol: scope.tokenSymbol,
-        periodAmount: periodAmountBigInt.toString(),
-        periodAmountFormatted: scope.periodAmountFormatted,
-        periodDuration: scope.periodDuration,
-      });
-
+      
       erc7715Permissions.push({
         chainId: 11155111, // Sepolia
         expiry,
@@ -171,14 +159,12 @@ export async function grantERC7715Permissions(
     throw new Error('No permissions to grant');
   }
 
-  console.log(`[ERC-7715] Requesting ${erc7715Permissions.length} permissions (batched!)`);
-  console.log('[ERC-7715] Permission types:', erc7715Permissions.map(p => p.permission.type));
-
+  
+  
   // Step 6: Request execution permissions (supports batching!)
   const grantedPermissions = await walletClient.requestExecutionPermissions(erc7715Permissions as any);
 
-  console.log('[ERC-7715] Permissions granted:', grantedPermissions);
-
+  
   if (!grantedPermissions || grantedPermissions.length === 0) {
     throw new Error('No permissions were granted');
   }
@@ -191,9 +177,8 @@ export async function grantERC7715Permissions(
   const permissionsContext = firstPermission.context;
   const delegationManager = firstPermission.signerMeta?.delegationManager || null;
 
-  console.log('[ERC-7715] Permission granted with context:', permissionsContext);
-  console.log('[ERC-7715] Delegation manager:', delegationManager);
-
+  
+  
   return {
     smartAccountAddress,
     permissionsContext,
@@ -233,14 +218,12 @@ export async function registerWalletAgent(
     scopes: scopes
   };
 
-  console.log('[Wallet Agent] Registering with backend delegation key:', backendDelegationAddress);
-  console.log('[Wallet Agent] Scopes:', scopes);
-  console.log('Registering wallet agent with params:', requestBody);
-
+  
+  
+  
   const response = await apiClient.post('REGISTER_WALLET_AGENT_URL', requestBody) as any;
 
-  console.log('Wallet agent registered:', response);
-
+  
   if (!response.success) {
     throw new Error(response.message || 'Failed to register wallet agent');
   }

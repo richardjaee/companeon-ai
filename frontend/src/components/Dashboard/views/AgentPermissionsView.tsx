@@ -77,10 +77,10 @@ export default function AgentPermissionsView({
   };
 
   const handleGrantComplete = async () => {
-    console.log('[AgentPermissionsView] Grant complete, calling onComplete...');
+    
     if (onComplete) {
       await onComplete();
-      console.log('[AgentPermissionsView] onComplete finished');
+      
     }
   };
 

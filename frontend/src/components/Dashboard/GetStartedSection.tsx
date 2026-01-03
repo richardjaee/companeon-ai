@@ -137,7 +137,7 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
         controls={agentControls}
         onSave={(newControls) => {
           setAgentControls(newControls);
-          console.log('[GetStartedSection] ⚙️ Agent settings updated:', newControls);
+          
         }}
       />
     </>

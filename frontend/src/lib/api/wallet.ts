@@ -83,20 +83,19 @@ export const walletApi = {
     chainId: number = 11155111
   ): Promise<GetWalletLimitsResponse> => {
     try {
-      console.log('[walletApi.getWalletLimits] request', { walletAddress, chainId });
+      
       const response = await apiClient.get<GetWalletLimitsResponse>(
         'GET_WALLET_LIMITS_URL',
         { walletAddress, chainId }
       );
-      console.log('[walletApi.getWalletLimits] response', response);
-
+      
       if (!response.success) {
         throw new Error('Failed to get wallet limits');
       }
 
       return response;
     } catch (error) {
-      console.error('[walletApi] Error getting wallet limits:', error);
+      
       Sentry.captureException(error);
       throw error;
     }

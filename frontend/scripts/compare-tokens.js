@@ -83,38 +83,34 @@ const currentTokens = extractTokenDefinitions(currentContent);
 // Find missing addresses
 const missingAddresses = updatedAddresses.filter(addr => !currentAddresses.includes(addr));
 
-console.log('='.repeat(80));
-console.log('TOKEN COMPARISON REPORT');
-console.log('='.repeat(80));
-console.log(`\nTokens in updated file: ${updatedAddresses.length}`);
-console.log(`Tokens in current file: ${currentAddresses.length}`);
-console.log(`Missing tokens: ${missingAddresses.length}\n`);
+
+
+
+
+
 
 if (missingAddresses.length > 0) {
-  console.log('MISSING TOKENS:\n');
-
+  
   missingAddresses.forEach(addr => {
     const tokenDef = updatedTokens[addr];
     if (tokenDef) {
-      console.log(tokenDef);
-      console.log(',');
+      
+      
     }
   });
 
-  console.log('\n' + '='.repeat(80));
-  console.log('SUMMARY OF MISSING TOKENS:');
-  console.log('='.repeat(80) + '\n');
-
+  
+  
+  
   missingAddresses.forEach(addr => {
     const symbolMatch = updatedTokens[addr]?.match(/"symbol":\s*"([^"]+)"/);
     const nameMatch = updatedTokens[addr]?.match(/"name":\s*"([^"]+)"/);
 
     if (symbolMatch && nameMatch) {
-      console.log(`${symbolMatch[1].padEnd(10)} - ${nameMatch[1]} (${addr})`);
+      
     }
   });
 } else {
-  console.log('✅ All tokens from updated file are present in current file!');
+  
 }
 
-console.log('\n' + '='.repeat(80));

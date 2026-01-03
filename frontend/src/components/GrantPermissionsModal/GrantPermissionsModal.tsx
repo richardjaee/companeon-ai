@@ -142,13 +142,13 @@ export default function GrantPermissionsModal({
       const currentChainNumber = parseInt(currentChainId, 16);
 
       if (currentChainNumber !== 11155111) {
-        console.log(`[GrantPermissions] Wallet on chain ${currentChainNumber}, switching to Sepolia...`);
+        
         try {
           await effectiveEthereum.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: '0xaa36a7' }], // Sepolia
           });
-          console.log('[GrantPermissions] Switched to Sepolia');
+          
         } catch (switchError: any) {
           if (switchError.code === 4902) {
             await effectiveEthereum.request({
@@ -174,10 +174,10 @@ export default function GrantPermissionsModal({
       // The actual requestExecutionPermissions call will confirm if Flask works
       const hasFlask = await isMetaMaskFlask(effectiveEthereum);
       if (!hasFlask) {
-        console.warn('[GrantPermissions] Flask detection returned false, but proceeding anyway');
-        console.warn('[GrantPermissions] The test page works without detection, so we should too');
+        
+        
       } else {
-        console.log('[GrantPermissions] Flask detected successfully');
+        
       }
 
       setCurrentStage('');
@@ -205,7 +205,7 @@ export default function GrantPermissionsModal({
 
       // Detect smart account implementation
       const detection = await detectSmartAccountImplementation(effectiveEthereum);
-      console.log(`[Permission Grant] Using ${detection.implementation}: ${detection.message}`);
+      
       setImplementation(detection.implementation);
 
       // Validate at least one permission has a limit set
@@ -230,13 +230,7 @@ export default function GrantPermissionsModal({
       );
 
       // Log the NEW permission contexts from MetaMask (for debugging stale context issues)
-      console.log('[GrantPermissions] ✅ NEW smartAccountResult:', {
-        smartAccountAddress: smartAccountResult.smartAccountAddress,
-        permissionsContext: smartAccountResult.permissionsContext?.slice(0, 40) + '...',
-        allPermissionContexts: smartAccountResult.allPermissionContexts ? Object.keys(smartAccountResult.allPermissionContexts) : [],
-        delegationManager: smartAccountResult.delegationManager
-      });
-
+      
       setSmartAccountAddress(smartAccountResult.smartAccountAddress);
       setPermissionsContext(smartAccountResult.permissionsContext || null);
       setAllPermissionContexts(smartAccountResult.allPermissionContexts || null);
@@ -246,9 +240,8 @@ export default function GrantPermissionsModal({
       setSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'completed' } : s));
       setCurrentStage('');
 
-      console.log('[GrantPermissions] ERC-7715 permissions granted, proceeding to register wallet agent');
-      console.log('[GrantPermissions] All permission contexts:', smartAccountResult.allPermissionContexts);
-
+      
+      
       // Proceed to step 2 - PASS ALL CONTEXTS so backend can use the right one per token
       setTimeout(() => {
         handleRegisterWalletAgent(
@@ -294,10 +287,9 @@ export default function GrantPermissionsModal({
       setCurrentStage('Registering wallet agent...');
 
       // DEBUG: Log what we received to register
-      console.log('[RegisterWalletAgent] ✅ Received permContext:', permContext?.slice(0, 40) + '...');
-      console.log('[RegisterWalletAgent] ✅ Received allContexts:', allContexts ? Object.keys(allContexts) : 'none');
-      console.log('[RegisterWalletAgent] Received delegManager:', delegManager);
-
+      
+      
+      
       if (!effectiveAddress) {
         throw new Error('Wallet address is required');
       }
@@ -413,16 +405,14 @@ export default function GrantPermissionsModal({
         scopes: scopes
       };
 
-      console.log('[Wallet Agent] Registering with backend delegation key:', backendDelegationAddress);
-      console.log('[Wallet Agent] Scopes:', scopes);
-      console.log('[Wallet Agent] All permission contexts:', allContexts ? Object.keys(allContexts) : 'none');
-      console.log('Registering wallet agent with params:', requestBody);
-
+      
+      
+      
+      
       // Call REGISTER_WALLET_AGENT_URL endpoint
       const response = await apiClient.post('REGISTER_WALLET_AGENT_URL', requestBody) as any;
 
-      console.log('Wallet agent registered:', response);
-
+      
       if (!response.success) {
         throw new Error(response.message || 'Failed to register wallet agent');
       }
@@ -436,7 +426,7 @@ export default function GrantPermissionsModal({
       setCurrentView('success');
 
     } catch (err: any) {
-      console.error('Error registering wallet agent:', err);
+      
       Sentry.captureException(err);
       setError(err?.message || 'Failed to register wallet agent');
       setIsProcessing(false);
@@ -585,10 +575,10 @@ export default function GrantPermissionsModal({
 
               <button
                 onClick={async () => {
-                  console.log('[GrantPermissionsModal] Done clicked, calling onComplete...');
+                  
                   if (onComplete) {
                     await onComplete();
-                    console.log('[GrantPermissionsModal] onComplete finished');
+                    
                   }
                   onClose();
                 }}

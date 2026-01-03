@@ -207,8 +207,7 @@ export default function WalletConnectModal({
   const handleCDPSuccess = async (address: string) => {
     try {
       // Store CDP address and close modal
-      console.log('[CDP] Authentication successful, address:', address);
-
+      
       // Trigger wallet connected event
       window.dispatchEvent(new CustomEvent('wallet:connected', {
         detail: { authenticated: true, address }

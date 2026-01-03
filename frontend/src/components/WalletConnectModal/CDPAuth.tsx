@@ -23,22 +23,21 @@ function CDPAuthContent({ onSuccess, onError }: CDPAuthProps) {
   useEffect(() => {
     const checkExistingAuth = async () => {
       try {
-        console.log('[CDP] Checking for existing auth session after redirect...');
+        
         const { getCurrentUser } = await import('@coinbase/cdp-core');
         const user = await getCurrentUser();
 
-        console.log('[CDP] getCurrentUser result:', user);
-
+        
         if (user?.evmAccounts?.[0]) {
-          console.log('[CDP] Found existing authenticated user, completing sign-in with address:', user.evmAccounts[0]);
+          
           onSuccess(user.evmAccounts[0]);
         } else if (user) {
-          console.log('[CDP] User authenticated but no wallet address found, user:', user);
+          
         } else {
-          console.log('[CDP] No authenticated user found');
+          
         }
       } catch (error) {
-        console.log('[CDP] Error checking auth session:', error);
+        
       }
     };
 
@@ -47,7 +46,7 @@ function CDPAuthContent({ onSuccess, onError }: CDPAuthProps) {
 
     // Also check when page regains focus (after OAuth redirect)
     const handleFocus = () => {
-      console.log('[CDP] Page regained focus, re-checking auth...');
+      
       checkExistingAuth();
     };
 
@@ -61,14 +60,14 @@ function CDPAuthContent({ onSuccess, onError }: CDPAuthProps) {
 
     setIsSubmitting(true);
     try {
-      console.log('[CDP] Attempting email sign-in for:', email);
+      
       const { signInWithEmail } = await import('@coinbase/cdp-core');
       const result = await signInWithEmail({ email });
-      console.log('[CDP] Email sign-in successful, flowId:', result.flowId);
+      
       setFlowId(result.flowId);
       setFlowType('email');
     } catch (error: any) {
-      console.error('[CDP] Email sign-in error:', error);
+      
       Sentry.captureException(error);
       onError(error?.message || 'Failed to send verification code');
     } finally {
@@ -97,21 +96,21 @@ function CDPAuthContent({ onSuccess, onError }: CDPAuthProps) {
   const handleGoogleSignIn = async () => {
     setIsSubmitting(true);
     try {
-      console.log('[CDP] Attempting Google OAuth sign-in');
+      
       const { signInWithOAuth, getCurrentUser } = await import('@coinbase/cdp-core');
 
       await signInWithOAuth('google');
-      console.log('[CDP] Google OAuth redirect initiated');
+      
       const user = await getCurrentUser();
 
       if (user?.evmAccounts?.[0]) {
-        console.log('[CDP] Google sign-in successful, address:', user.evmAccounts[0]);
+        
         onSuccess(user.evmAccounts[0]);
       } else {
         throw new Error('No wallet address found');
       }
     } catch (error: any) {
-      console.error('[CDP] Google OAuth error:', error);
+      
       Sentry.captureException(error);
       onError(error?.message || 'Google sign-in failed');
     } finally {
@@ -338,16 +337,16 @@ export default function CDPAuth({ onSuccess, onError }: CDPAuthProps) {
 
         // Clear any stale CDP sessions from IndexedDB to prevent 401 errors
         try {
-          console.log('[CDP] Clearing stale CDP storage...');
+          
           const databases = await window.indexedDB.databases();
           for (const db of databases) {
             if (db.name && (db.name.includes('cdp') || db.name.includes('coinbase'))) {
-              console.log('[CDP] Deleting database:', db.name);
+              
               window.indexedDB.deleteDatabase(db.name);
             }
           }
         } catch (storageError) {
-          console.log('[CDP] Could not clear storage:', storageError);
+          
         }
 
         await initialize({
@@ -359,7 +358,7 @@ export default function CDPAuth({ onSuccess, onError }: CDPAuthProps) {
 
         setIsInitialized(true);
       } catch (error: any) {
-        console.error('[CDP] Initialization error:', error);
+        
         // Still allow auth to proceed even if init has errors
         setIsInitialized(true);
       }

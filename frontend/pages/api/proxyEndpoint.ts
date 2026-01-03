@@ -9,9 +9,8 @@ export const config = {
   }
 };
 
-console.log('[ProxyEndpoint] 🏗️ Initializing endpoint map...');
-console.log('[ProxyEndpoint] 🔑 CREATE_AGENT_SESSION_URL:', process.env.CREATE_AGENT_SESSION_URL);
-console.log('[ProxyEndpoint] 🔑 LIVE_AGENT_ASK_STREAM_URL:', process.env.LIVE_AGENT_ASK_STREAM_URL);
+
+
 
 const endpointMap: { [key: string]: string | undefined } = {
   GET_TOKENS: process.env.GET_TOKENS_URL,
@@ -129,7 +128,7 @@ export default async function handler(
 
   // Validate that body exists and is properly parsed
   if (!req.body || typeof req.body !== 'object') {
-    console.error('[ProxyEndpoint] ❌ Invalid or missing request body');
+    
     Sentry.captureMessage('Invalid request body to proxyEndpoint', {
       level: 'warning',
       extra: {
@@ -149,16 +148,14 @@ export default async function handler(
       .json({ error: 'Endpoint is required in the request body.' });
   }
 
-  console.log('[ProxyEndpoint] 📨 Request for endpoint:', endpoint);
-
+  
   let url = endpointMap[endpoint];
 
-  console.log('[ProxyEndpoint] 🔍 Endpoint URL:', url);
-  console.log('[ProxyEndpoint] 🗺️ Available endpoints:', Object.keys(endpointMap));
-
+  
+  
   if (!url) {
-    console.error('[ProxyEndpoint] ❌ Endpoint not found in map:', endpoint);
-    console.error('[ProxyEndpoint] 📋 Endpoint map has these keys:', Object.keys(endpointMap));
+    
+    
     return res
       .status(400)
       .json({
@@ -236,7 +233,7 @@ export default async function handler(
           }
           res.end();
         } catch (streamError) {
-          console.error('Stream error:', streamError);
+          
           res.end();
         }
       } else {

@@ -109,17 +109,13 @@ export const nftApi = {
 
   async getTokens(address: string, chainId: number): Promise<TokenResponse> {
     try {
-      console.log('[nftApi.getTokens] request', { address, chainId });
+      
       const response = await apiClient.post<TokenResponse>('GET_TOKENS', {
         walletAddress: address,
         chainId,
       });
-      console.log('[nftApi.getTokens] raw response', response);
-      console.log('[nftApi.getTokens] response summary', {
-        chainId,
-        tokenCount: response?.tokens?.length || 0,
-        hasEthBalance: !!response?.eth,
-      });
+      
+      
       return response;
     } catch (error) {
       Sentry.captureException(error);
@@ -136,16 +132,13 @@ export const nftApi = {
 
   getNFTs: async (walletAddress: string, chainId: number) => {
     try {
-      console.log('[nftApi.getNFTs] request', { walletAddress, chainId });
+      
       const response = await apiClient.post<{ nfts: any[] }>('GET_NFTS', {
         walletAddress: walletAddress.toLowerCase(),
         chainId,
       });
-      console.log('[nftApi.getNFTs] raw response', response);
-      console.log('[nftApi.getNFTs] response summary', {
-        chainId,
-        nftCount: response?.nfts?.length || 0,
-      });
+      
+      
       return response;
     } catch (error) {
       Sentry.captureException(error);

@@ -158,10 +158,9 @@ export default function CompaneonChatInterface({
   };
 
   const startNewChat = () => {
-      console.log('[CompaneonChat] 🔄 Starting new chat...');
-
+      
     if (isConnecting || isStreamActiveRef.current) {
-      console.log('[CompaneonChat] ⚠️ Cannot start new chat - stream still active or connecting');
+      
       return;
     }
 
@@ -431,7 +430,7 @@ export default function CompaneonChatInterface({
           const targetChainId = config.chainId;
 
           if (currentChainNumber !== targetChainId) {
-            console.log(`[CompaneonChat] Wallet on chain ${currentChainNumber}, switching to chain ${targetChainId}...`);
+            
             const targetChainIdHex = '0x' + targetChainId.toString(16);
 
             try {
@@ -439,17 +438,17 @@ export default function CompaneonChatInterface({
                 method: 'wallet_switchEthereumChain',
                 params: [{ chainId: targetChainIdHex }],
               });
-              console.log(`[CompaneonChat] Switched to chain ${targetChainId}`);
+              
             } catch (switchError: any) {
               if (switchError.code === 4001) {
                 throw new Error(`Please switch to ${config.name} network to continue`);
               }
-              console.warn('[CompaneonChat] Could not switch network:', switchError);
+              
               // Continue anyway - signature should still work
             }
           }
         } catch (networkError: any) {
-          console.warn('[CompaneonChat] Network check/switch failed:', networkError);
+          
           // Continue anyway - signature should still work
         }
       }
@@ -469,8 +468,7 @@ export default function CompaneonChatInterface({
       }
 
       // Show a message while waiting for signature
-      console.log('[CompaneonChat] 🔏 Waiting for wallet signature...');
-
+      
       try {
         const signature = await signMessage(challenge);
         if (!signature) {
@@ -501,7 +499,7 @@ export default function CompaneonChatInterface({
         throw signError;
       }
     } catch (error) {
-      console.error('[CompaneonChat] ❌ Wallet action verification error:', error);
+      
       throw error;
     }
   };
@@ -570,10 +568,10 @@ export default function CompaneonChatInterface({
       } catch (fetchError: any) {
         if (timeoutId) clearTimeout(timeoutId);
         if (fetchError.name === 'AbortError') {
-          console.error('[CompaneonChat] ❌ Agent session request timed out after 30s');
+          
           throw new Error('Request timed out. The agent service may be slow or unavailable.');
         }
-        console.error('[CompaneonChat] ❌ Agent session fetch error:', fetchError);
+        
         throw fetchError;
       }
 
@@ -584,10 +582,10 @@ export default function CompaneonChatInterface({
           errorData = await sessionResponse.json();
         } catch (e) {
           const errorText = await sessionResponse.text();
-          console.error('[CompaneonChat] ❌ Agent session error (text):', errorText);
+          
           throw new Error(`Failed to create agent session: ${sessionResponse.status} - ${errorText}`);
         }
-        console.error('[CompaneonChat] ❌ Agent session creation failed:', errorData);
+        
         throw new Error(errorData.error || `Failed to create agent session: ${sessionResponse.status}`);
       }
 
@@ -596,16 +594,16 @@ export default function CompaneonChatInterface({
       const newAgentSessionId = sessionData.sessionId || sessionData.agentSessionId;
 
       if (!newAgentSessionId) {
-        console.error('[CompaneonChat] ❌ No session ID in response');
+        
         throw new Error('No session ID returned from agent session creation');
       }
 
-      console.log('[CompaneonChat] 🎉 Agent session created successfully! Session ID:', newAgentSessionId);
+      
       setAgentSessionId(newAgentSessionId);
 
       return { sessionId: newAgentSessionId, agentSessionId: newAgentSessionId };
     } catch (error) {
-      console.error('[CompaneonChat] ❌ Error in createChatSession:', error);
+      
       throw error;
     }
   };
@@ -704,7 +702,7 @@ export default function CompaneonChatInterface({
 
   const connectToAI = async () => {
     if (connectionInProgressRef.current || isConnected) {
-      console.log('[CompaneonChat] 🔄 Connection already in progress or established');
+      
       return;
     }
 
@@ -726,10 +724,9 @@ export default function CompaneonChatInterface({
       setIsConnecting(false);
       connectionInProgressRef.current = false;
 
-      console.log('[CompaneonChat] ✅ Connected with agent session ID:', agentSessionId);
-
+      
     } catch (error: any) {
-      console.error('[CompaneonChat] ❌ Connection error:', error);
+      
       setIsConnecting(false);
       connectionInProgressRef.current = false;
       setIsConnected(false);
@@ -752,17 +749,15 @@ export default function CompaneonChatInterface({
   const sendMessage = async (messageText?: string) => {
     const message = messageText || inputMessage.trim();
     if (!message || !isConnected || !agentSessionId) {
-      console.warn('[CompaneonChat] ⚠️ Cannot send message:', { message: !!message, isConnected, agentSessionId });
+      
       return;
     }
 
-    console.log('[CompaneonChat] 📝 Sending prompt:', message);
-
+    
     // Debounce timeout for ask_delta UI updates (declared at function scope for cleanup)
     let updateTimeout: NodeJS.Timeout | null = null;
 
-    console.log('[CompaneonChat] 📝 Adding user message:', { message, length: message.length });
-
+    
     setMessages(prev => {
       const newMessage: ChatMessage = {
         id: generateMessageId(),
@@ -775,7 +770,7 @@ export default function CompaneonChatInterface({
           isActive: true
         }
       };
-      console.log('[CompaneonChat] 📝 Created user message object:', newMessage);
+      
       return [...prev, newMessage];
     });
 
@@ -844,7 +839,7 @@ export default function CompaneonChatInterface({
 
       // Timeout: if neither ask nor done arrives within 5min, close and retry
       let streamTimeout = setTimeout(() => {
-        console.warn('[CompaneonChat] ⏰ Stream timeout (5min) - closing stream');
+        
         reader.cancel();
         abortControllerRef.current?.abort();
       }, 300000);  // 5 minutes to allow time for blockchain transactions
@@ -860,8 +855,7 @@ export default function CompaneonChatInterface({
           isStreamActiveRef.current = false; // Mark stream as no longer active
 
           // Debug: Log final stream state
-          console.log(`[CompaneonChat] 🔚 Stream closed - ask:${receivedAsk}, done:${turnComplete}, content:${streamingMessageContent.length > 0 ? 'yes' : 'no'}`);
-
+          
           // More lenient completion logic:
           // 1. If we received both ask and done events (ideal case)
           // 2. If we received ask but stream closed naturally (fallback)
@@ -870,20 +864,13 @@ export default function CompaneonChatInterface({
           const isComplete = (receivedAsk && turnComplete) || receivedAsk || hasStreamingContent;
 
           if (!isComplete) {
-            console.warn('[CompaneonChat] ⚠️ Stream incomplete - missing events:', {
-              ask: !receivedAsk ? 'MISSING' : 'received',
-              done: !turnComplete ? 'MISSING' : 'received',
-              streamingContent: hasStreamingContent ? 'present' : 'MISSING',
-              lastEvents: eventLog.slice(-5).map(e => e.type)
-            });
+            
           } else {
             // Stream completed successfully
-            console.log('[CompaneonChat] ✅ Stream completed successfully');
-
+            
             if (hasStreamingContent && !receivedAsk) {
               // Only create message if ask event didn't already create one
-              console.log('[CompaneonChat] 📝 Creating final message from streaming content (no ask event received)');
-
+              
               setMessages(prev => {
                 const newMessages = [...prev];
                 const lastUserMessageIndex = [...newMessages].reverse().findIndex(msg => msg.type === 'user');
@@ -960,7 +947,7 @@ export default function CompaneonChatInterface({
             // Reset timeout on ANY event (backend sends heartbeats to keep alive)
             clearTimeout(streamTimeout);
             const newTimeout = setTimeout(() => {
-              console.warn('[CompaneonChat] ⏰ Stream timeout (5min) - closing stream');
+              
               reader.cancel();
               abortControllerRef.current?.abort();
             }, 300000); // 5 minutes to allow for blockchain transactions and long-running tools
@@ -971,14 +958,13 @@ export default function CompaneonChatInterface({
 
             if (event.type === 'thinking') {
               // Agent is processing (per official spec)
-              console.log('[CompaneonChat] 🤔 Thinking:', event.iteration);
+              
               setIsTyping(true);
 
               // Just show "Thinking..." indicator, no text content
             } else if (event.type === 'thinking_delta') {
               // Agent's thinking process - show below current tool
-              console.log('[CompaneonChat] 💭 Thinking delta:', event.text);
-
+              
               setMessages(prev => {
                 const newMessages = [...prev];
                 const lastUserMessageIndex = [...newMessages].reverse().findIndex(msg => msg.type === 'user');
@@ -1028,11 +1014,10 @@ export default function CompaneonChatInterface({
                 });
               }
             } else if (event.type === 'model_prompt') {
-              console.log('[CompaneonChat] 🧠 Model prompt:', event.prompt);
+              
             } else if (event.type === 'model_response') {
               // IMPORTANT: DO NOT CLOSE STREAM - tools and ask will follow!
-              console.log('[CompaneonChat] 📋 Model response (plan JSON) - stream continues...');
-
+              
               const textChunk = event.text || '';
               currentAssistantMessage += textChunk;
 
@@ -1042,11 +1027,10 @@ export default function CompaneonChatInterface({
                                      (trimmed.includes('"plan"') || trimmed.includes('"calls"'));
 
               if (looksLikeJSON) {
-                console.log('[CompaneonChat] ℹ️ Skipping display of plan JSON (waiting for ask)');
+                
               }
             } else if (event.type === 'tool_progress') {
               // Progress updates during long-running tools
-              console.log('[CompaneonChat] ⚡ Tool progress:', event.tool, event.status);
 
               const toolName = event.tool || 'unknown';
               const progressMessage = event.status || '';
@@ -1091,8 +1075,7 @@ export default function CompaneonChatInterface({
               });
             } else if (event.type === 'tool_call') {
               // IMPORTANT: DO NOT CLOSE STREAM - waiting for tool_result then ask!
-              console.log('[CompaneonChat] 🔧 Tool call:', event.tool, event);
-
+              
               const toolName = event.tool || 'unknown';
 
               // Increment counter and create unique key for this tool call
@@ -1123,8 +1106,7 @@ export default function CompaneonChatInterface({
                 return newMessages;
               });
             } else if (event.type === 'tool_result') {
-              console.log('[CompaneonChat] ✅ Tool result:', event.tool, event);
-
+              
               const toolName = event.tool || 'unknown';
 
               // Mark tool as completed - find the most recent running tool with this name
@@ -1170,8 +1152,7 @@ export default function CompaneonChatInterface({
               // Store txHash to attach to final response (don't create separate message)
               if (event.output && event.output.txHash) {
                 currentTxHashes.push(event.output.txHash);
-                console.log('[CompaneonChat] 🔗 Stored txHash:', event.output.txHash, '(total:', currentTxHashes.length, ')');
-
+                
                 // Emit event to refresh holdings in the UI
                 if (typeof window !== 'undefined') {
                   window.dispatchEvent(new CustomEvent('companeon-transaction-complete', {
@@ -1182,7 +1163,7 @@ export default function CompaneonChatInterface({
 
               // Handle x402 payments - refresh limits even without txHash
               if (event.tool === 'pay_x402') {
-                console.log('[CompaneonChat] 💳 x402 payment completed, refreshing limits');
+                
                 if (typeof window !== 'undefined') {
                   window.dispatchEvent(new CustomEvent('companeon-transaction-complete', {
                     detail: { tool: 'pay_x402', output: event.output }
@@ -1192,20 +1173,18 @@ export default function CompaneonChatInterface({
 
               // Handle web_research tool results - store citations to attach to final message
               if (event.tool === 'web_research' && event.output) {
-                console.log('[CompaneonChat] 🔬 Web research result:', event.output);
-
+                
                 // Store citations to attach to the final LLM response
                 if (event.output.citations && Array.isArray(event.output.citations)) {
                   currentCitations = event.output.citations;
-                  console.log('[CompaneonChat] 📚 Stored', currentCitations.length, 'citations for final message');
+                  
                 }
               }
 
               // Note: generate_image now emits via 'generated_image' event to avoid LLM token overflow
             } else if (event.type === 'tool_error') {
               // Tool execution error
-              console.error('[CompaneonChat] ❌ Tool error:', event.tool, event.error);
-
+              
               const toolName = event.tool || 'unknown';
 
               // Mark tool as error - find the most recent running tool with this name
@@ -1249,12 +1228,10 @@ export default function CompaneonChatInterface({
               });
             } else if (event.type === 'tx_message') {
               // Transaction notification (e.g., x402 payment)
-              console.log('[CompaneonChat] 💸 Transaction message:', event.message, event.txHash);
-
+              
               // Store txHash for final message button
               currentTxHashes.push(event.txHash);
-              console.log('[CompaneonChat] 🔗 Stored txHash from tx_message:', event.txHash, '(total:', currentTxHashes.length, ')');
-
+              
               // Emit event to refresh holdings in the UI
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('companeon-transaction-complete', {
@@ -1263,8 +1240,7 @@ export default function CompaneonChatInterface({
               }
             } else if (event.type === 'followup_resolved') {
               // User input was clarified/normalized
-              console.log('[CompaneonChat] 🔄 Follow-up resolved:', event.normalized, event.action);
-
+              
               // Hidden - don't show "Interpreted as" message to user
               // if (event.normalized) {
               // setMessages(prev => [...prev, {
@@ -1279,7 +1255,7 @@ export default function CompaneonChatInterface({
 
               // Guard: Prevent duplicate
               if (receivedAsk || receivedAskStart) {
-                console.log('[CompaneonChat] ⚠️ Skipping duplicate ask_start');
+                
                 continue;
               }
 
@@ -1351,9 +1327,8 @@ export default function CompaneonChatInterface({
                 updateTimeout = null;
               }
 
-              console.log('[CompaneonChat] 💬 Ask (final):', event.message);
-              console.log('[CompaneonChat] 📊 Streaming content length:', streamingMessageContent.length);
-
+              
+              
               receivedAsk = true; // Mark that we got the final response
               // IMPORTANT: Prefer streamingMessageContent if we have it (from ask_delta)
               // Only use event.message if we didn't get any streaming chunks
@@ -1371,8 +1346,7 @@ export default function CompaneonChatInterface({
               const capturedRequiresConfirmation = requiresConfirmation;
               const capturedConfirmationQuestion = confirmationQuestion;
 
-              console.log('[CompaneonChat] 📝 Creating final message with', capturedTxHashes.length, 'txHashes (deduplicated from', currentTxHashes.length, ')');
-
+              
               // Update or create message
               setMessages(prev => {
                 const newMessages = [...prev];
@@ -1450,20 +1424,18 @@ export default function CompaneonChatInterface({
               currentTxHashes = []; // Reset txHashes for next message
               setIsTyping(false);
 
-              console.log('[CompaneonChat] ✅ Received final ask - waiting for done...');
+              
             } else if (event.type === 'error') {
               // Handle error events from the agent
-              console.error('[CompaneonChat] ❌ Error:', event.message);
 
               setIsTyping(false);
               setIsStreamActive(false);
             } else if (event.type === 'heartbeat') {
               // Keep-alive ping - ignore in UI
-              console.log('[CompaneonChat] 💓 Heartbeat:', event.ts);
+              
             } else if (event.type === 'generated_image') {
               // Image generated - store to attach to final LLM response
-              console.log('[CompaneonChat] 🖼️ Image URL:', event.imageUrl);
-
+              
               currentImageData = {
                 dataUrl: event.imageUrl,
                 prompt: event.prompt,
@@ -1473,10 +1445,9 @@ export default function CompaneonChatInterface({
                 generatedAt: event.generatedAt
               };
 
-              console.log('[CompaneonChat] 🖼️ Stored image data for final message');
+              
             } else if (event.type === 'permission_update_request') {
-              console.log('[CompaneonChat] 🔑 Permission update requested:', event);
-
+              
               // Handle permission update asynchronously (no UI message - agent already explained it)
               (async () => {
                 try {
@@ -1507,15 +1478,13 @@ export default function CompaneonChatInterface({
                   await sendMessage('Permissions updated successfully!');
 
                 } catch (error: any) {
-                  console.error('[CompaneonChat] ❌ Permission update failed:', error);
-
+                  
                   // Send error message to chat
                   await sendMessage(`Permission update failed: ${error.message || 'Unknown error'}`);
                 }
               })();
             } else if (event.type === 'done') {
-              console.log('[CompaneonChat] 🏁 Done event - turn complete!');
-
+              
               // Clear any pending debounced updates and flush final state
               if (updateTimeout) {
                 clearTimeout(updateTimeout);
@@ -1561,9 +1530,9 @@ export default function CompaneonChatInterface({
               setIsTyping(false);
               setIsStreamActive(false);
 
-              console.log('[CompaneonChat] ✅ Turn complete - stream will close naturally');
+              
             } else if (event.type === 'final') {
-              console.log('[CompaneonChat] 🏁 Final event');
+              
               setMessages(prev => {
                 const newMessages = [...prev];
                 const lastMsg = newMessages[newMessages.length - 1];
@@ -1577,7 +1546,7 @@ export default function CompaneonChatInterface({
             }
 
           } catch (parseError) {
-            console.error('[CompaneonChat] ❌ Failed to parse SSE event:', chunk, parseError);
+            
           }
         }
       }
@@ -1586,8 +1555,7 @@ export default function CompaneonChatInterface({
       setIsStreamActive(false);
 
     } catch (error: any) {
-      console.error('[CompaneonChat] ❌ Stream error:', error);
-
+      
       // Clean up any pending debounced updates
       if (updateTimeout) {
         clearTimeout(updateTimeout);
@@ -1596,7 +1564,7 @@ export default function CompaneonChatInterface({
       isStreamActiveRef.current = false; // Mark stream as no longer active
 
       if (error.name === 'AbortError') {
-        console.log('[CompaneonChat] 🛑 Stream aborted by user');
+        
         return;
       }
 
@@ -1610,8 +1578,7 @@ export default function CompaneonChatInterface({
   };
 
   const stopStream = () => {
-    console.log('[CompaneonChat] 🛑 Stopping stream...');
-
+    
     // Abort the ongoing fetch request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -1679,11 +1646,11 @@ export default function CompaneonChatInterface({
       return () => {
         // Only abort if there's no active stream
         if (abortControllerRef.current && !isStreamActiveRef.current) {
-          console.log('[CompaneonChat] 🧹 Cleanup: Aborting controller (no active stream)');
+          
           abortControllerRef.current.abort();
           abortControllerRef.current = null;
         } else if (isStreamActiveRef.current) {
-          console.log('[CompaneonChat] 🔒 Cleanup: Skipping abort (stream is active)');
+          
         }
       };
     }
@@ -1702,11 +1669,11 @@ export default function CompaneonChatInterface({
       mounted = false;
       // Only abort if there's no active stream
       if (abortControllerRef.current && !isStreamActiveRef.current) {
-        console.log('[CompaneonChat] 🧹 Cleanup: Aborting controller (no active stream)');
+        
         abortControllerRef.current.abort();
         abortControllerRef.current = null;
       } else if (isStreamActiveRef.current) {
-        console.log('[CompaneonChat] 🔒 Cleanup: Skipping abort (stream is active)');
+        
       }
     };
   }, [autoConnect, isConnecting, isConnected, agentSessionId, connectionError]);
@@ -2240,7 +2207,7 @@ export default function CompaneonChatInterface({
                                   setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
                                 }
                               } catch (error) {
-                                console.error('[CompaneonChat] ❌ Error downloading image:', error);
+                                
                                 alert('Failed to download image. Please try again.');
                               }
                             }}
@@ -2608,7 +2575,7 @@ export default function CompaneonChatInterface({
         controls={agentControls}
         onSave={(newControls) => {
           setAgentControls(newControls);
-          console.log('[CompaneonChat] ⚙️ Agent settings updated:', newControls);
+          
         }}
       />
 

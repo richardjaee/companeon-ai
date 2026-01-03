@@ -28,8 +28,8 @@ export async function detectSmartAccountImplementation(
   // Always return success - let the actual permission request determine if Flask works
   // Flask detection can return false even when Flask is installed and working
   if (!hasFlask) {
-    console.warn('[SmartAccount] Flask detection returned false, but proceeding anyway');
-    console.warn('[SmartAccount] The actual permission request will confirm if Flask is available');
+    
+    
   }
 
   return {
@@ -45,8 +45,7 @@ export async function detectSmartAccountImplementation(
  * Create smart account using ERC-7715 (Flask required)
  * 
  * This function ONLY grants ERC-7715 permissions (on Sepolia).
- * It does NOT create an NFT agent - use createSmartAccountWithAgent for that.
- * 
+  * 
  * Used by: GrantPermissionsModal for wallet agent permissions
  */
 export async function createSmartAccount(
@@ -58,9 +57,8 @@ export async function createSmartAccount(
 ): Promise<CreateSmartAccountResult & { implementation: SmartAccountImplementation }> {
   const detection = await detectSmartAccountImplementation(ethereum);
 
-  console.log(`[SmartAccount] ${detection.message}`);
-  console.log(`[SmartAccount] Implementation: ${detection.implementation}`);
-
+  
+  
   // Create ERC-7715 smart account with permissions (on Sepolia)
   const smartAccountResult = await createSmartAccountWithPermissions(
     ethereum,
@@ -69,8 +67,7 @@ export async function createSmartAccount(
     delegateAddress
   );
 
-  console.log('[Router] ERC-7715 smart account created:', smartAccountResult.smartAccountAddress);
-
+  
   // Return the ERC-7715 result directly (no NFT minting for wallet agent flow)
   return {
     ...smartAccountResult,

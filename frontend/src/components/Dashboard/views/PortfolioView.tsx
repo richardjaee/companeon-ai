@@ -243,47 +243,38 @@ export default function PortfolioView() {
   // Fetch wallet limits function (extracted for reuse)
   const fetchWalletLimits = useCallback(async () => {
     if (!address || !isConnected) {
-      console.log('[PortfolioView] ❌ No wallet address or not connected');
+      
       setWalletLimits([]);
       return;
     }
 
-    console.log('[PortfolioView] 🚀 Fetching wallet limits for:', address);
+    
     setIsLoadingLimits(true);
     try {
       const response = await walletApi.getWalletLimits(address);
-      console.log('[PortfolioView] ✅ Got wallet limits response:', response);
-
+      
       // Handle nested output structure from backend
       const data = (response as any).output || response;
 
       if (response.success && data.delegationEnabled && data.limits && data.limits.length > 0) {
         // Fallback global expiry if per-limit not available
         const globalExpiryDate = data.expiresAt ? new Date(data.expiresAt) : null;
-        console.log('[PortfolioView] Global expiresAt:', data.expiresAt);
-
+        
         // Map all limits to display format with per-token expiration
         const mappedLimits = data.limits.map((limit: any) => {
-          console.log(`[PortfolioView] Processing ${limit.asset}:`, {
-            expiresAt: limit.expiresAt,
-            startTime: limit.startTime,
-            expiresIn: limit.expiresIn
-          });
-
+          
           // Use per-limit expiresAt if available, otherwise fall back to global
           const limitExpiryDate = limit.expiresAt 
             ? new Date(limit.expiresAt) 
             : globalExpiryDate;
           
-          console.log(`[PortfolioView] ${limit.asset} limitExpiryDate:`, limitExpiryDate?.toLocaleDateString());
           
           // Use per-limit startTime if available, otherwise estimate from expiry
           const limitStartDate = limit.startTime 
             ? new Date(typeof limit.startTime === 'number' ? limit.startTime * 1000 : limit.startTime)
             : (limitExpiryDate ? new Date(limitExpiryDate.getTime() - (30 * 24 * 60 * 60 * 1000)) : null);
 
-          console.log(`[PortfolioView] ${limit.asset} limitStartDate:`, limitStartDate?.toLocaleDateString());
-
+          
           return {
             asset: limit.asset,
             tokenAddress: limit.tokenAddress,
@@ -299,13 +290,13 @@ export default function PortfolioView() {
         });
 
         setWalletLimits(mappedLimits);
-        console.log('[PortfolioView] 💰 Agent permissions active! Mapped limits:', mappedLimits);
+        
       } else {
-        console.log('[PortfolioView] ℹ️ No active delegations');
+        
         setWalletLimits([]);
       }
     } catch (error) {
-      console.error('[PortfolioView] ❌ Error fetching wallet limits:', error);
+      
       setWalletLimits([]);
     } finally {
       setIsLoadingLimits(false);
@@ -314,16 +305,16 @@ export default function PortfolioView() {
 
   // Handler for when permissions are successfully granted - refresh limits then close
   const handleAgentPermissionsComplete = useCallback(async () => {
-    console.log('[PortfolioView] ✅ Agent permissions granted, starting refresh...');
+    
     try {
       // Small delay to allow backend to process the new permissions
-      console.log('[PortfolioView] ⏳ Waiting 1.5s for backend to process...');
+      
       await new Promise(resolve => setTimeout(resolve, 1500));
-      console.log('[PortfolioView] 🔄 Calling fetchWalletLimits...');
+      
       await fetchWalletLimits();
-      console.log('[PortfolioView] ✅ fetchWalletLimits completed, closing bottom sheet');
+      
     } catch (error) {
-      console.error('[PortfolioView] ❌ Error refreshing limits:', error);
+      
     }
     setIsAgentPermissionsClosing(true);
   }, [fetchWalletLimits]);
@@ -332,8 +323,7 @@ export default function PortfolioView() {
   useEffect(() => {
     const handleTransactionComplete = async (e: Event) => {
       const customEvent = e as CustomEvent;
-      console.log('[PortfolioView] 🔄 Transaction completed, refreshing balances and limits...', customEvent.detail);
-
+      
       try {
         // Invalidate queries to trigger refetch of token data
         await queryClient.invalidateQueries({ queryKey: ['tokenData'] });
@@ -343,9 +333,9 @@ export default function PortfolioView() {
         // Refresh wallet limits to update remaining amounts
         await fetchWalletLimits();
 
-        console.log('[PortfolioView] ✅ Balances and limits refreshed successfully');
+        
       } catch (error) {
-        console.error('[PortfolioView] ❌ Error refreshing balances and limits:', error);
+        
       }
     };
 

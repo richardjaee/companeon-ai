@@ -52,11 +52,11 @@ export class SessionStore {
         facts: { ...initialFacts }
       });
       // DEBUG: Log when new session is created
-      console.log(`[SessionStore] ensure: CREATED NEW session=${id}, totalSessions=${this.sessions.size}`);
+      
     } else {
       // DEBUG: Log when existing session is reused
       const session = this.sessions.get(id);
-      console.log(`[SessionStore] ensure: REUSING session=${id}, factKeys=${Object.keys(session.facts).join(',')}, hasPending=${!!session.facts.pendingSwapIntent}`);
+      
     }
     return this.get(id);
   }
@@ -113,7 +113,7 @@ export class SessionStore {
     session.facts[key] = value;
     // DEBUG: Log fact setting for troubleshooting
     if (key === 'pendingSwaps' || key === 'pendingSwapIntent') {
-      console.log(`[SessionStore] setFact: session=${id}, key=${key}, valueExists=${!!value}, sessionHas=${this.sessions.has(id)}`);
+      
     }
   }
 
@@ -132,7 +132,7 @@ export class SessionStore {
     const session = this.get(id);
     const facts = session?.facts || {};
     // DEBUG: Log when facts are retrieved
-    console.log(`[SessionStore] getFacts: session=${id}, sessionExists=${!!session}, hasPendingSwaps=${!!facts.pendingSwaps?.length}, hasPendingSwapIntent=${!!facts.pendingSwapIntent}`);
+    
     return facts;
   }
 

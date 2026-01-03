@@ -65,7 +65,7 @@ class WalletEventManager {
           // If we have a previous address and it's different, clear cache
           if (this.lastKnownAddress && currentAddress &&
               this.lastKnownAddress.toLowerCase() !== currentAddress.toLowerCase()) {
-            console.log('Address changed, clearing cache');
+            
             window.localStorage.removeItem('wallet_current_address');
             window.localStorage.removeItem('current_auth_address');
             window.localStorage.removeItem('auth_token');

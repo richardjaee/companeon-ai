@@ -49,7 +49,7 @@ async function snapshot() {
 }
 
 snapshot().catch((err) => {
-  console.error('Failed to snapshot price cache:', err.message || err);
+  
   process.exit(1);
 });
 

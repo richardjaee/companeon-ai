@@ -40,7 +40,7 @@ export class FirestoreSessionStore {
       facts: { ...initialFacts }
     });
 
-    console.log(`[FirestoreSessionStore] CREATED session=${id}`);
+    
     return id;
   }
 
@@ -60,12 +60,12 @@ export class FirestoreSessionStore {
         messages: [],
         facts: { ...initialFacts }
       });
-      console.log(`[FirestoreSessionStore] ensure: CREATED NEW session=${id}`);
+      
     } else {
       // Update last accessed time
       await docRef.update({ lastAccessedAt: Date.now() });
       const data = doc.data();
-      console.log(`[FirestoreSessionStore] ensure: REUSING session=${id}, factKeys=${Object.keys(data.facts || {}).join(',')}, hasPending=${!!data.facts?.pendingSwapIntent}`);
+      
     }
     
     return this.get(id);
@@ -144,7 +144,7 @@ export class FirestoreSessionStore {
     });
     
     if (key === 'pendingSwaps' || key === 'pendingSwapIntent') {
-      console.log(`[FirestoreSessionStore] setFact: session=${id}, key=${key}, valueExists=${!!value}`);
+      
     }
   }
 
@@ -165,14 +165,13 @@ export class FirestoreSessionStore {
   async getFacts(id) {
     const doc = await this.collection.doc(id).get();
     if (!doc.exists) {
-      console.log(`[FirestoreSessionStore] getFacts: session=${id} NOT FOUND`);
+      
       return {};
     }
     
     const data = doc.data();
     const facts = data.facts || {};
     
-    console.log(`[FirestoreSessionStore] getFacts: session=${id}, hasPendingSwaps=${!!facts.pendingSwaps?.length}, hasPendingSwapIntent=${!!facts.pendingSwapIntent}`);
     
     return facts;
   }
@@ -219,7 +218,7 @@ export class FirestoreSessionStore {
 
     if (!snapshot.empty) {
       await batch.commit();
-      console.log(`[FirestoreSessionStore] Cleaned up ${snapshot.size} expired sessions`);
+      
     }
 
     return snapshot.size;
