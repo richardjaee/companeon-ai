@@ -277,6 +277,45 @@ SSE Events:
 
 ---
 
+## Agent-to-Agent (A2A) Recurring Transfers
+
+This backend supports recurring transfers via Agent‑to‑Agent (A2A) delegation:
+
+- Companeon creates a sub‑delegation to a Transfer Agent
+- The Transfer Agent executes recurring transfers using the user's ERC‑7715 permissions
+- Schedules are stored in Firestore; execution can be triggered by a Cloud Function or cron worker
+
+LLM Tools
+
+- `preview_recurring_transfer` – preview and ask for confirmation
+- `schedule_recurring_transfer` – create the recurring transfer
+- `list_recurring_transfers` – list transfer schedules
+- `cancel_recurring_transfer` – cancel by schedule ID
+- `trigger_scheduled_now` – call a Cloud Function to run due items (optional)
+- `list_all_scheduled` – list both transfers and DCAs (if present)
+
+Environment
+
+- `DCA_AGENT_PRIVATE_KEY` – EOA for the DCA Agent (recurring DCA)
+- `TRANSFER_AGENT_PRIVATE_KEY` – EOA for the Transfer Agent (recurring transfers)
+- `BACKEND_DELEGATION_KEY` – backend delegate key (ERC‑7715)
+- `FIREBASE_FUNCTIONS_URL` – base URL for the trigger endpoint (optional)
+- `GOOGLE_CLOUD_PROJECT` / `FIREBASE_PROJECT_ID` – Firestore project
+
+Firestore Collections
+
+- `RecurringTransferSchedules` – recurring transfer metadata
+- `SubDelegations` – sub‑delegation records per wallet/schedule
+
+Relevant files
+
+- Sub‑delegation helpers: `backend/src/lib/subDelegation.js`
+- Transfer Agent tools: `backend/src/tools/definitions/transfer-agent.js`
+- DCA Agent tools: `backend/src/tools/definitions/dca-agent.js`
+- Unified management (list/trigger): `backend/src/tools/definitions/autonomous-agents.js`
+
+---
+
 ## Available Tools
 
 ### Wallet Management
