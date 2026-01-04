@@ -34,6 +34,60 @@ The agent handles routing, gas optimization, transaction simulation, and error r
 
 ---
 
+## Project Structure
+
+```
+companeon-ai/
+├── README.md
+├── backend/
+│   ├── src/
+│   │   ├── index.js                 # Express server
+│   │   ├── agent/
+│   │   │   ├── Agent.js            # ReAct loop
+│   │   │   └── wallet-prompts.js   # System prompts
+│   │   ├── llm/
+│   │   │   └── GeminiClient.js     # LLM integration
+│   │   ├── tools/
+│   │   │   ├── ToolRegistry.js     # Tool management
+│   │   │   └── definitions/
+│   │   │       ├── wallet-*.js     # Wallet tools
+│   │   │       ├── delegation.js   # Permission tools
+│   │   │       ├── envio.js        # Envio history tools
+│   │   │       ├── transfer-agent.js      # A2A: recurring transfers
+│   │   │       ├── dca-agent.js           # A2A: recurring DCA
+│   │   │       └── autonomous-agents.js   # A2A: unified list/trigger
+│   │   ├── lib/
+│   │   │   ├── delegationSigner.js # ERC-7715 signer
+│   │   │   ├── subDelegation.js    # A2A helpers (EIP-712, chain)
+│   │   │   └── chainConfig.js      # Multi-chain config
+│   │   └── memory/
+│   │       └── FirestoreSessionStore.js
+│   ├── package.json
+│   └── .env.example
+│
+└── frontend/
+    ├── src/
+    │   ├── app/                    # Next.js App Router
+    │   │   ├── [chain]/           # Chain-specific routes
+    │   │   └── layout.tsx         # Root layout
+    │   ├── components/
+    │   │   ├── Chat/              # AI chat interface
+    │   │   ├── Dashboard/         # Portfolio & permissions UI
+    │   │   ├── GrantPermissionsModal/ # ERC-7715 grant UI
+    │   │   └── shared/            # Reusable components
+    │   ├── lib/
+    │   │   ├── smartAccount/
+    │   │   │   └── grantPermissions.ts # ERC-7715 grant logic
+    │   │   ├── wallets/           # Wallet providers
+    │   │   └── api/               # Backend API client
+    │   ├── hooks/                 # React hooks
+    │   └── context/               # React context providers
+    ├── package.json
+    └── .env.example
+```
+
+---
+
 ## Advanced Permissions Usage
 
 Companeon is built on ERC-7715 Advanced Permissions using MetaMask Smart Accounts Kit. All transactions execute via the DelegationManager with wallet-enforced spending limits.
@@ -55,6 +109,20 @@ Core implementation:
 
 Permission-aware tools:
 - [`backend/src/tools/definitions/delegation.js`](./backend/src/tools/definitions/delegation.js) - Agent tools for querying live permission state (`check_delegation_limits`) and diagnosing enforcer errors (`diagnose_delegation_error`)
+
+### Agent‑to‑Agent (A2A) Delegation
+
+In addition to direct wallet execution, Companeon supports Agent‑to‑Agent sub‑delegation for scheduled automation:
+
+- User → Companeon permissions are granted via ERC‑7715 (MetaMask Smart Accounts Kit)
+- Companeon → Agent (Transfer/DCA) sub‑delegations are created and signed (EIP‑712)
+- Execution uses a chained context validated by the DelegationManager
+
+Code links:
+- Sub‑delegation helpers: [`backend/src/lib/subDelegation.js`](./backend/src/lib/subDelegation.js)
+- Transfer Agent tools: [`backend/src/tools/definitions/transfer-agent.js`](./backend/src/tools/definitions/transfer-agent.js)
+- DCA Agent tools: [`backend/src/tools/definitions/dca-agent.js`](./backend/src/tools/definitions/dca-agent.js)
+- Unified list/trigger: [`backend/src/tools/definitions/autonomous-agents.js`](./backend/src/tools/definitions/autonomous-agents.js)
 
 ### How It Works
 
@@ -454,57 +522,7 @@ npm run dev
 
 ---
 
-## Project Structure
-
-```
-companeon-ai/
-├── README.md
-├── backend/
-│   ├── src/
-│   │   ├── index.js                 # Express server
-│   │   ├── agent/
-│   │   │   ├── Agent.js            # ReAct loop
-│   │   │   └── wallet-prompts.js   # System prompts
-│   │   ├── llm/
-│   │   │   └── GeminiClient.js     # LLM integration
-│   │   ├── tools/
-│   │   │   ├── ToolRegistry.js     # Tool management
-│   │   │   └── definitions/
-│   │   │       ├── wallet-*.js     # Wallet tools
-│   │   │       ├── delegation.js   # Permission tools
-│   │   │       ├── envio.js        # Envio history tools
-│   │   │       └── research.js     # x402 tools
-│   │   ├── lib/
-│   │   │   ├── delegationSigner.js # ERC-7715 signer
-│   │   │   ├── chainConfig.js      # Multi-chain config
-│   │   │   └── signer.js           # Signer driver
-│   │   └── memory/
-│   │       └── FirestoreSessionStore.js
-│   ├── package.json
-│   └── .env.example
-│
-└── frontend/
-    ├── src/
-    │   ├── app/                    # Next.js App Router
-    │   │   ├── [chain]/           # Chain-specific routes
-    │   │   └── layout.tsx         # Root layout
-    │   ├── components/
-    │   │   ├── Chat/              # AI chat interface
-    │   │   ├── Dashboard/         # Portfolio & permissions UI
-    │   │   ├── GrantPermissionsModal/ # ERC-7715 grant UI
-    │   │   └── shared/            # Reusable components
-    │   ├── lib/
-    │   │   ├── smartAccount/
-    │   │   │   └── grantPermissions.ts # ERC-7715 grant logic
-    │   │   ├── wallets/           # Wallet providers
-    │   │   └── api/               # Backend API client
-    │   ├── hooks/                 # React hooks
-    │   └── context/               # React context providers
-    ├── package.json
-    └── .env.example
-```
-
----
+##
 
 ## Tech Stack
 
