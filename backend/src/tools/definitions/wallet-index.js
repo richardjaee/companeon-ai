@@ -14,6 +14,9 @@ import { researchTools } from './research.js';
 import { delegationTools } from './delegation.js';
 import { gasTools } from './gas.js';
 import { envioTools } from './envio.js';
+import { dcaAgentTools } from './dca-agent.js';
+import { transferAgentTools } from './transfer-agent.js';
+import { autonomousAgentTools } from './autonomous-agents.js';
 
 // Add default tags to tools that don't have them
 function tagTools(tools, defaultTags) {
@@ -75,6 +78,17 @@ export function registerWalletTools(registry) {
     registry.register(tool);
   }
 
+  // A2A / Recurring transfer tools (agent-to-agent)
+  for (const tool of dcaAgentTools) {
+    registry.register(tool);
+  }
+  for (const tool of transferAgentTools) {
+    registry.register(tool);
+  }
+  for (const tool of autonomousAgentTools) {
+    registry.register(tool);
+  }
+
   return registry;
 }
 
@@ -94,4 +108,3 @@ export function getAllWalletTools() {
     ...tagTools(envioTools, ['free', 'read', 'history', 'envio'])
   ];
 }
-
