@@ -1,0 +1,77 @@
+# Companeon Microservices - Local Development
+# Usage: docker-compose up
+
+version: "3.9"
+
+services:
+  # Core LLM Agent Service
+  agent:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: companeon-agent
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - SERVICE_NAME=companeon-agent
+    env_file:
+      - ./backend/.env
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - companeon-network
+
+  # API Gateway Service (auth, wallets, credits, assets)
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: companeon-api
+    ports:
+      - "8081:8080"
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - SERVICE_NAME=companeon-api
+      - AGENT_SERVICE_URL=http://agent:8080
+    env_file:
+      - ./services/api/.env
+    depends_on:
+      agent:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - companeon-network
+
+  # Background Worker Service (cron jobs, scheduled tasks)
+  worker:
+    build:
+      context: ./services/worker
+      dockerfile: Dockerfile
+    container_name: companeon-worker
+    environment:
+      - NODE_ENV=development
+      - SERVICE_NAME=companeon-worker
+      - AGENT_SERVICE_URL=http://agent:8080
+      - API_SERVICE_URL=http://api:8080
+    env_file:
+      - ./services/worker/.env
+    depends_on:
+      - agent
+      - api
+    networks:
+      - companeon-network
+
+networks:
+  companeon-network:
+    driver: bridge

@@ -1,10 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { nftApi } from '@/lib/api/nft';
-import { getSupportedTokens } from '@/lib/constants/tokens';
 import { useUnifiedWallet } from './useUnifiedWallet';
 import { useChain } from './useChain';
-
-const SUPPORTED_TOKENS = getSupportedTokens();
 
 interface SolanaProgramData {
   ownerAddress: string;

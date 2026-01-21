@@ -252,7 +252,7 @@ function getUsdcAddressForChain(chainId = null) {
 export const researchTools = [
   {
     name: 'get_x402_quote',
-    description: `⚠️ CALL THIS FIRST before any x402 service! Gets a quote with gas estimate.
+    description: `IMPORTANT: CALL THIS FIRST before any x402 service! Gets a quote with gas estimate.
 
 This tool:
 1. Calls estimate_gas_cost internally (visible in output)

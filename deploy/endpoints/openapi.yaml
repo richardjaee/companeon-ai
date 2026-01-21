@@ -1,0 +1,325 @@
+swagger: "2.0"
+info:
+  title: "companeon-api"
+  description: "Companeon API Gateway - Cloud Endpoints in front of Cloud Run services."
+  version: "1.0.0"
+
+host: companeon-api.endpoints.companeon.cloud.goog
+x-google-endpoints:
+  - name: companeon-api.endpoints.companeon.cloud.goog
+    allowCors: true
+
+schemes:
+  - https
+produces:
+  - application/json
+consumes:
+  - application/json
+
+securityDefinitions:
+  api_key:
+    type: apiKey
+    name: x-api-key
+    in: header
+
+security:
+  - api_key: []
+
+x-google-management:
+  metrics:
+    - name: "read-requests"
+      displayName: "Read Requests"
+      valueType: INT64
+      metricKind: DELTA
+    - name: "auth-requests"
+      displayName: "Auth Requests"
+      valueType: INT64
+      metricKind: DELTA
+    - name: "write-requests"
+      displayName: "Write Requests"
+      valueType: INT64
+      metricKind: DELTA
+  quota:
+    limits:
+      - name: "read-limit"
+        metric: "read-requests"
+        unit: "1/min/{project}"
+        values:
+          STANDARD: 200
+      - name: "auth-limit"
+        metric: "auth-requests"
+        unit: "1/min/{project}"
+        values:
+          STANDARD: 30
+      - name: "write-limit"
+        metric: "write-requests"
+        unit: "1/min/{project}"
+        values:
+          STANDARD: 50
+
+paths:
+  # ============================================
+  # AUTH ENDPOINTS
+  # ============================================
+  /auth/nonce:
+    post:
+      operationId: getWalletNonce
+      summary: "Get a nonce for wallet action verification"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/auth/nonce
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          auth-requests: 1
+      responses:
+        '200':
+          description: "Nonce and message to sign"
+
+  /auth/verify:
+    post:
+      operationId: verifyWalletAction
+      summary: "Verify wallet signature and create session"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/auth/verify
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          auth-requests: 1
+      responses:
+        '200':
+          description: "Session ID and verification status"
+
+  # ============================================
+  # WALLET ENDPOINTS
+  # ============================================
+  /wallet/register-agent:
+    post:
+      operationId: registerWalletAgent
+      summary: "Register ERC-7715 delegation for a wallet"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/wallet/register-agent
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          write-requests: 1
+      responses:
+        '200':
+          description: "Registration confirmation"
+
+  /wallet/status:
+    get:
+      operationId: getWalletStatus
+      summary: "Get wallet delegation status"
+      parameters:
+        - name: wallet
+          in: query
+          required: true
+          type: string
+          description: "Wallet address"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/wallet/status
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Wallet status"
+
+  /wallet/limits:
+    get:
+      operationId: getWalletLimits
+      summary: "Get wallet spending limits"
+      parameters:
+        - name: wallet
+          in: query
+          required: true
+          type: string
+          description: "Wallet address"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/wallet/limits
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Wallet limits and scopes"
+
+  /wallet/revoke:
+    delete:
+      operationId: revokeWalletDelegation
+      summary: "Revoke wallet delegation"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/wallet/revoke
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          write-requests: 1
+      responses:
+        '200':
+          description: "Revocation confirmation"
+
+  # ============================================
+  # ASSETS ENDPOINTS
+  # ============================================
+  /assets/tokens:
+    post:
+      operationId: getTokens
+      summary: "Get token balances for a wallet"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/assets/tokens
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Token balances with USD values"
+
+  /assets/nfts:
+    post:
+      operationId: getNFTs
+      summary: "Get NFTs for a wallet"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/assets/nfts
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "NFT list with metadata"
+
+  # ============================================
+  # PRICES ENDPOINTS
+  # ============================================
+  /prices/cache:
+    get:
+      operationId: getPriceCache
+      summary: "Get cached token prices"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/prices/cache
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Price cache data"
+
+  /prices/range:
+    get:
+      operationId: getHistoricalPrices
+      summary: "Get historical price data"
+      parameters:
+        - name: token
+          in: query
+          required: true
+          type: string
+        - name: from
+          in: query
+          required: false
+          type: string
+        - name: to
+          in: query
+          required: false
+          type: string
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/prices/range
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Historical prices"
+
+  # ============================================
+  # AGENT ENDPOINTS (API Service)
+  # ============================================
+  /agent/tools:
+    get:
+      operationId: getAgentTools
+      summary: "Get available agent tools"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/agent/tools
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Tools catalog"
+
+  /agent/logs:
+    get:
+      operationId: getAgentLogs
+      summary: "Get agent execution logs"
+      parameters:
+        - name: wallet
+          in: query
+          required: true
+          type: string
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          default: 50
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/agent/logs
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          read-requests: 1
+      responses:
+        '200':
+          description: "Agent logs"
+
+  # ============================================
+  # LIVE AGENT ENDPOINTS (Agent Service)
+  # ============================================
+  /live/sessions:
+    post:
+      operationId: createAgentSession
+      summary: "Create a new agent session"
+      x-google-backend:
+        address: https://companeon-agent-440170696844.us-central1.run.app/sessions
+        path_translation: CONSTANT_ADDRESS
+      x-google-quota:
+        metricCosts:
+          write-requests: 1
+      responses:
+        '200':
+          description: "Session created"
+
+  /live/messages/stream:
+    post:
+      operationId: streamAgentMessages
+      summary: "Stream agent messages (SSE)"
+      produces:
+        - text/event-stream
+      x-google-backend:
+        address: https://companeon-agent-440170696844.us-central1.run.app/live/messages/stream
+        path_translation: CONSTANT_ADDRESS
+        deadline: 300.0
+      x-google-quota:
+        metricCosts:
+          write-requests: 1
+      responses:
+        '200':
+          description: "SSE stream of agent events"
+
+  # ============================================
+  # HEALTH CHECK
+  # ============================================
+  /health:
+    get:
+      operationId: healthCheck
+      summary: "Health check endpoint"
+      x-google-backend:
+        address: https://companeon-api-440170696844.us-central1.run.app/health
+        path_translation: CONSTANT_ADDRESS
+      responses:
+        '200':
+          description: "Service healthy"
