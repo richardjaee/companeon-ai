@@ -24,12 +24,12 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
   return (
     <>
       {(showWelcomeBanner || showAIBanner) && (
-        <div className="mb-6">
-          <div className="p-4 -ml-4">
-            <div className="flex gap-4">
+        <div className="pt-6 mb-6">
+          <div className="">
+            <div className="grid grid-cols-2 gap-4">
               {/* Welcome Card */}
               {showWelcomeBanner && (
-            <div className="bg-purple-50 rounded-lg shadow-sm overflow-hidden inline-block relative">
+            <div className="bg-purple-50 rounded-lg shadow-sm overflow-hidden relative">
               {/* Close button */}
               <button
                 onClick={() => setShowWelcomeBanner(false)}
@@ -85,9 +85,9 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
           </div>
           )}
 
-          {/* assistant Assistant Setup Card */}
+          {/* Assistant Setup Card */}
           {showAIBanner && (
-            <div className="bg-green-50 rounded-lg shadow-sm inline-block relative">
+            <div className="bg-green-50 rounded-lg shadow-sm relative">
               {/* Close button */}
               <button
                 onClick={() => setShowAIBanner(false)}

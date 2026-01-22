@@ -609,8 +609,6 @@ export interface TokenDisplay extends TokenInfo {
 
 export const TOKEN_LOGO_BASE_PATH = '/logos';
 
-const logoPathCheckCache: Record<string, boolean> = {};
-
 export const getTokenDataByAddress = (contractAddress: string): TokenData | null => {
 
   if (!contractAddress || contractAddress.toLowerCase() === 'native') {
@@ -630,112 +628,36 @@ export const getTokenDataByAddress = (contractAddress: string): TokenData | null
 };
 
 export const getTokenLogoByAddress = (contractAddress: string, alchemyLogoUrl?: string): string => {
+  // If alchemy provides a logo URL, use that (most reliable)
+  if (alchemyLogoUrl) {
+    return alchemyLogoUrl;
+  }
+
   if (!contractAddress) {
     return '/placeholder.png';
   }
-  
-  const isContractAddress = contractAddress === 'native' || 
-                           (contractAddress.startsWith('0x') && contractAddress.length === 42);
-  
-  if (!isContractAddress) {
-    
-    const possibleToken = Object.entries(TOKEN_CONTRACTS).find(
-      ([_, data]) => data.symbol.toLowerCase() === contractAddress.toLowerCase()
-    );
-    
-    if (possibleToken) {
-      contractAddress = possibleToken[0];
-    } else if (contractAddress.toLowerCase() === 'eth') {
 
-      contractAddress = 'native';
-    }
+  // Handle native ETH
+  if (contractAddress.toLowerCase() === 'native' || contractAddress.toLowerCase() === 'eth') {
+    return '/logos/eth-logo.png';
   }
-  
-  if (contractAddress.toLowerCase() === 'native') {
-    const normalizedSymbol = 'eth';
 
-    if (logoPathCheckCache[normalizedSymbol] === false) {
-      return alchemyLogoUrl || '/placeholder.png';
-    }
-    
-    const localLogoPath = `/logos/${normalizedSymbol}-logo.png`;
-    
-    if (typeof window !== 'undefined') {
-      const checkImageExists = (url: string): Promise<boolean> => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(true);
-          img.onerror = () => resolve(false);
-          img.src = url;
-        });
-      };
-      
-      checkImageExists(localLogoPath)
-        .then(exists => {
-          logoPathCheckCache[normalizedSymbol] = exists;
-        })
-        .catch(() => {
-          logoPathCheckCache[normalizedSymbol] = false;
-        });
-    }
-    
-    return localLogoPath;
-  }
-  
+  // For contract addresses, look up the symbol
   const tokenData = getTokenDataByAddress(contractAddress);
-  const normalizedSymbol = tokenData?.symbol?.toLowerCase() || 'unknown';
-  
-  if (logoPathCheckCache[normalizedSymbol] === false) {
-
-    return alchemyLogoUrl || '/placeholder.png';
+  if (tokenData?.symbol) {
+    const normalizedSymbol = tokenData.symbol.toLowerCase();
+    // Only return local path for tokens we know we have logos for
+    const knownLogos = ['eth', 'usdc', 'usdt', 'dai', 'weth', 'wbtc', 'link', 'uni', 'aave'];
+    if (knownLogos.includes(normalizedSymbol)) {
+      return `/logos/${normalizedSymbol}-logo.png`;
+    }
   }
-  
-  const localLogoPath = `/logos/${normalizedSymbol}-logo.png`;
-  
-  const fallbackLogo = alchemyLogoUrl || '/placeholder.png';
-  
-  if (typeof window !== 'undefined') {
 
-    const checkImageExists = (url: string): Promise<boolean> => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(false);
-        img.src = url;
-      });
-    };
-    
-    checkImageExists(localLogoPath)
-      .then(exists => {
-        logoPathCheckCache[normalizedSymbol] = exists;
-        if (!exists) {
-          Sentry.captureException(`Token logo not found for ${contractAddress}`);
-        }
-      })
-      .catch(() => {
-        logoPathCheckCache[normalizedSymbol] = false;
-      });
-  }
-  
-  return localLogoPath;
+  // Default placeholder for unknown tokens
+  return '/placeholder.png';
 };
 
 export const getTokenLogo = (contractAddress: string, alchemyLogoUrl?: string): string => {
-  if (!contractAddress) return '/placeholder.png';
-  
-  try {
-    const cachedLogos = sessionStorage.getItem('tokenLogoCache');
-    if (cachedLogos) {
-      const parsedLogos = JSON.parse(cachedLogos);
-      const tokenData = getTokenDataByAddress(contractAddress);
-      if (tokenData?.symbol && parsedLogos[tokenData.symbol]) {
-        return parsedLogos[tokenData.symbol];
-      }
-    }
-  } catch (error) {
-
-  }
-
   return getTokenLogoByAddress(contractAddress, alchemyLogoUrl);
 };
 

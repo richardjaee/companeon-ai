@@ -90,7 +90,13 @@ export default function Sidebar({ currentSection, onSectionChange, isMobile = fa
       {/* Logo Section - aligned with the Portfolio header */}
       <div className="pt-5 pb-6 px-3 flex-shrink-0 flex justify-center">
         <Link href="/" className="flex items-center justify-center">
-          <span className="text-lg font-semibold">Companeon</span>
+          <Image
+            src="/companeon_symbol_square.png"
+            alt="Companeon"
+            width={48}
+            height={48}
+            className="w-12 h-12 object-contain"
+          />
         </Link>
       </div>
 

@@ -170,8 +170,9 @@ export default async function handler(
   };
 
   // Use API key for all endpoints
-  if (process.env.API_KEY) {
-    headers['x-api-key'] = process.env.API_KEY;
+  const apiKey = process.env.API_KEY;
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
   }
 
   const actualMethod = method.toUpperCase();
@@ -250,7 +251,7 @@ export default async function handler(
     return res.status(response.status).json(responseData);
   } catch (error) {
     Sentry.captureException(error);
-    
+
     let errorMessage = 'Request failed after multiple retries. Please try again later.';
     
     if (error instanceof Error) {

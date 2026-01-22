@@ -50,7 +50,7 @@ export default async function handler(
     
     const body = JSON.parse(bodyStr);
     
-    const { walletAddress, agentSessionId, prompt, tokenId, controls } = body;
+    const { walletAddress, agentSessionId, prompt, tokenId, controls, chainId } = body;
 
     
     if (!agentSessionId || !prompt) {
@@ -88,7 +88,8 @@ export default async function handler(
       prompt,
       tokenId,
       controls,
-      walletAddress
+      walletAddress,
+      chainId
     });
 
     // Filter out client's Content-Type to prevent override

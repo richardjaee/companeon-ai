@@ -262,30 +262,36 @@ export default function PortfolioView() {
         
         // Map all limits to display format with per-token expiration
         const mappedLimits = data.limits.map((limit: any) => {
-          
-          // Use per-limit expiresAt if available, otherwise fall back to global
-          const limitExpiryDate = limit.expiresAt 
-            ? new Date(limit.expiresAt) 
-            : globalExpiryDate;
-          
-          
-          // Use per-limit startTime if available, otherwise estimate from expiry
-          const limitStartDate = limit.startTime 
-            ? new Date(typeof limit.startTime === 'number' ? limit.startTime * 1000 : limit.startTime)
-            : (limitExpiryDate ? new Date(limitExpiryDate.getTime() - (30 * 24 * 60 * 60 * 1000)) : null);
+          // Use pre-formatted dates from API if available, otherwise fall back to computing
+          let startDateDisplay = limit.startTimeFormatted || 'Not set';
+          let endDateDisplay = limit.expiresAtFormatted || limit.expiresIn || 'Not set';
 
-          
+          // Fallback: if no formatted dates, compute from timestamps
+          // API timestamps may be in seconds (Unix) or milliseconds - check and convert
+          if (!limit.startTimeFormatted && limit.startTime) {
+            const ts = limit.startTime < 4102444800 ? limit.startTime * 1000 : limit.startTime;
+            startDateDisplay = new Date(ts).toLocaleDateString();
+          }
+          if (!limit.expiresAtFormatted && limit.expiresAt) {
+            const ts = limit.expiresAt < 4102444800 ? limit.expiresAt * 1000 : limit.expiresAt;
+            endDateDisplay = new Date(ts).toLocaleDateString();
+          }
+
+          // Use human-readable frequency from API (e.g., "per day", "per hour")
+          // Fall back to periodDuration if frequency not available
+          const frequencyDisplay = limit.frequency || limit.periodDuration || 'daily';
+
           return {
             asset: limit.asset,
             tokenAddress: limit.tokenAddress,
             configuredLimit: limit.configuredLimit,
-            remainingLimit: `${limit.available} ${limit.asset}`,
-            frequency: limit.periodDuration,
-            startDate: limitStartDate ? limitStartDate.toLocaleDateString() : 'Not set',
-            endDate: limitExpiryDate ? limitExpiryDate.toLocaleDateString() : limit.expiresIn || 'Not set',
+            remainingLimit: `${limit.available}`,
+            frequency: frequencyDisplay,
+            startDate: startDateDisplay,
+            endDate: endDateDisplay,
             // Also store raw values for debugging
             expiresIn: limit.expiresIn,
-            rawExpiresAt: limit.expiresAt // Keep raw value for debugging
+            rawExpiresAt: limit.expiresAt
           };
         });
 
@@ -945,31 +951,29 @@ export default function PortfolioView() {
       <div className="flex-1 flex lg:flex-row flex-col overflow-hidden">
         {/* Left Column - Main Content - Now scrollable */}
         <div className={`lg:order-1 order-2 flex-1 flex flex-col min-h-0 overflow-y-auto relative ${isTokenSelectionMode ? 'pb-24' : 'pb-6'}`} style={{ isolation: 'isolate' }}>
-              {/* Get Started Section */}
-              {!isConnected && (
-                <div className="pt-2 pb-0 lg:px-6 px-4">
-                  <GetStartedSection
-                    onStartCoinSelection={() => {
-                      setIsTokenSelectionMode(true);
-                      setIsDepositingMode(true);
-                    }}
-                    isSelectionMode={isTokenSelectionMode}
-                    isWalletConnected={isConnected}
-                  />
-                </div>
-              )}
+              {/* Get Started Section - always show (banners are dismissible) */}
+              <div className="lg:px-6 px-4">
+                <GetStartedSection
+                  onStartCoinSelection={() => {
+                    setIsTokenSelectionMode(true);
+                    setIsDepositingMode(true);
+                  }}
+                  isSelectionMode={isTokenSelectionMode}
+                  isWalletConnected={isConnected}
+                />
+              </div>
 
               {/* Your Companeons Section */}
               {isConnected && (
-                <div className="pt-[10px] pb-6 lg:px-6 px-4">
+                <div className="pt-6 pb-6 lg:px-6 px-4">
                   <h2 className="text-lg font-medium text-gray-900 mb-4 mt-0">Your permissions</h2>
-                  <div className="space-y-3 pr-28">
+                  <div className="space-y-3">
                     {walletLimits.length > 0 ? (
                       walletLimits.map((tokenLimit: any) => (
-                      <div key={tokenLimit.asset} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                        <div className="flex items-center gap-10">
+                      <div key={tokenLimit.asset} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
+                        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
                           {/* Left: Logo + Custom Label */}
-                          <div className="flex items-center gap-3 min-w-[120px]">
+                          <div className="flex items-center gap-3 min-w-[100px]">
                             <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white flex-shrink-0">
                               <Image
                                 src={`/logos/${tokenLimit.asset.toLowerCase()}-logo.png`}
@@ -990,15 +994,15 @@ export default function PortfolioView() {
                           </div>
 
                           {/* Right: Limits in horizontal layout */}
-                          <div className="flex items-center gap-2 flex-1">
+                          <div className="flex flex-wrap items-center gap-4 lg:gap-6 flex-1">
                             {/* Spend Limit */}
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Spend limit</span>
                               <span className="text-sm font-medium text-gray-900">{tokenLimit.configuredLimit}</span>
                             </div>
 
                             {/* Remaining */}
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Remaining</span>
                               <span className={`text-sm font-medium transition-colors duration-1000 ${
                                 flashingLimits[tokenLimit.asset] === 'decrease'
@@ -1010,15 +1014,15 @@ export default function PortfolioView() {
                             </div>
 
                             {/* Frequency */}
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Frequency</span>
                               <span className="text-sm font-medium text-gray-900 capitalize">{tokenLimit.frequency}</span>
                             </div>
 
                             {/* Duration */}
-                            <div className="flex flex-col min-w-[150px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Duration</span>
-                              <span className="text-sm font-medium text-gray-900">{tokenLimit.startDate} - {tokenLimit.endDate}</span>
+                              <span className="text-sm font-medium text-gray-900 whitespace-nowrap">{tokenLimit.startDate} - {tokenLimit.endDate}</span>
                             </div>
                           </div>
 
@@ -1042,30 +1046,30 @@ export default function PortfolioView() {
                       </div>
                     ))
                     ) : (
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                        <div className="flex items-center gap-10">
-                          {/* Right: Limits with "Not set" values */}
-                          <div className="flex items-center gap-2 flex-1">
+                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
+                        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                          {/* Limits with "Not set" values */}
+                          <div className="flex flex-wrap items-center gap-4 lg:gap-6 flex-1">
                             {/* Spend Limit */}
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Spend limit</span>
                               <span className="text-sm font-medium text-gray-500">Not set</span>
                             </div>
 
                             {/* Remaining */}
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Remaining</span>
                               <span className="text-sm font-medium text-gray-500">Not set</span>
                             </div>
 
                             {/* Frequency */}
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Frequency</span>
                               <span className="text-sm font-medium text-gray-500">Not set</span>
                             </div>
 
                             {/* Duration */}
-                            <div className="flex flex-col min-w-[150px]">
+                            <div className="flex flex-col">
                               <span className="text-xs text-gray-600">Duration</span>
                               <span className="text-sm font-medium text-gray-500">Not set</span>
                             </div>

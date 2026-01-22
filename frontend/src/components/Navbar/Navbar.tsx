@@ -598,7 +598,7 @@ export default function Navbar() {
         <div className="flex justify-between items-center py-5">
           <Link href="/" className="no-underline">
             <Image 
-              src={isHomePage ? "/logo.png" : "/logo.png"}
+              src={isHomePage ? "/companeon_symbol_square.png" : "/companeon_symbol_square.png"}
               alt="Companeon"
               width={80}
               height={32}
@@ -652,7 +652,7 @@ export default function Navbar() {
             <div className="flex justify-between items-center py-5 border-b border-gray-200">
               <Link href="/" className="no-underline">
                 <Image 
-                  src="/logo.png"
+                  src="/companeon_symbol_square.png"
                   alt="Companeon"
                   width={70}
                   height={28}

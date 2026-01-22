@@ -40,8 +40,14 @@ export default function DashboardLayout({
           </svg>
         </button>
         
-        {/* Logo for mobile (placeholder text, no image asset) */}
-        <div className="text-base font-semibold">Companeon</div>
+        {/* Logo for mobile */}
+        <Image
+          src="/companeon_symbol_square.png"
+          alt="Companeon"
+          width={32}
+          height={32}
+          className="h-8 w-auto object-contain"
+        />
         
         {/* Right panel toggle for tablet/mobile */}
         {rightPanel && (
@@ -71,7 +77,13 @@ export default function DashboardLayout({
             <div className="relative flex flex-col w-64 bg-white border-r border-gray-200">
               {/* Close button */}
               <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                <div className="text-base font-semibold">Companeon</div>
+                <Image
+                  src="/companeon_symbol_square.png"
+                  alt="Companeon"
+                  width={32}
+                  height={32}
+                  className="h-8 w-auto object-contain"
+                />
                 <button
                   onClick={() => setIsMobileSidebarOpen(false)}
                   className="p-2 rounded-md hover:bg-gray-100"

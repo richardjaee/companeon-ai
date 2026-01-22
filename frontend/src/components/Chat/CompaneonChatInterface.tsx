@@ -399,9 +399,9 @@ export default function CompaneonChatInterface({
         <div className="flex-shrink-0 mr-3">
           <div className="w-8 h-8 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center">
             <Image 
-              src="/logo.png" 
-              alt="Companeon AI" 
-              width={20} 
+              src="/companeon_symbol_square.png"
+              alt="Companeon AI"
+              width={20}
               height={20}
               className="object-contain"
             />
@@ -794,7 +794,8 @@ export default function CompaneonChatInterface({
         agentSessionId,
         prompt: message,
         // no tokenId in wallet-only context
-        controls: agentControls
+        controls: agentControls,
+        chainId: config.chainId
       };
 
       // Create abort controller for this request
@@ -1742,10 +1743,10 @@ export default function CompaneonChatInterface({
               {msg.type !== 'user' && (
                 <div className="flex-shrink-0 mr-3">
                   <div className="w-8 h-8 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center">
-                    <Image 
-                      src="/logo.png" 
-                      alt="Companeon AI" 
-                      width={20} 
+                    <Image
+                      src="/companeon_symbol_square.png"
+                      alt="Companeon AI"
+                      width={20}
                       height={20}
                       className="object-contain"
                     />
@@ -2464,45 +2465,13 @@ export default function CompaneonChatInterface({
           <div className="text-xs text-gray-500 mb-2">Try asking:</div>
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => {
-                setInputMessage("Analyze my portfolio allocation");
-                setTimeout(() => {
-                  const message = "Analyze my portfolio allocation";
-                  setMessages(prev => [...prev, {
-                    id: generateMessageId(),
-                    type: 'user',
-                    message: message,
-                    timestamp: new Date().toISOString()
-                  }]);
-                  ws?.send(JSON.stringify({
-                    type: 'message',
-                    message: message
-                  }));
-                  setInputMessage('');
-                }, 100);
-              }}
+              onClick={() => sendMessage("Analyze my portfolio allocation")}
               className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
             >
               Analyze my holdings
             </button>
             <button
-              onClick={() => {
-                setInputMessage("What's the market outlook for my assets?");
-                setTimeout(() => {
-                  const message = "What's the market outlook for my assets?";
-                  setMessages(prev => [...prev, {
-                    id: generateMessageId(),
-                    type: 'user',
-                    message: message,
-                    timestamp: new Date().toISOString()
-                  }]);
-                  ws?.send(JSON.stringify({
-                    type: 'message',
-                    message: message
-                  }));
-                  setInputMessage('');
-                }, 100);
-              }}
+              onClick={() => sendMessage("What's the market outlook for my assets?")}
               className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full transition-colors"
             >
               Market outlook
