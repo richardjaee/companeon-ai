@@ -10,6 +10,7 @@ set -e
 PROJECT_ID="${GCP_PROJECT:-companeon}"
 REGION="${GCP_REGION:-us-central1}"
 ENV="prod"
+SUFFIX=""  # No suffix for prod (companeon-agent, companeon-api, etc.)
 TAG=$(date +%Y%m%d-%H%M%S)
 
 # Colors for output
@@ -22,6 +23,7 @@ echo -e "${GREEN}Companeon PRODUCTION Deployment${NC}"
 echo -e "${RED}WARNING: This deploys to PRODUCTION${NC}"
 echo "Project: ${PROJECT_ID}"
 echo "Region: ${REGION}"
+echo "Environment: ${ENV}"
 echo "Tag: ${TAG}"
 echo ""
 
@@ -108,14 +110,14 @@ deploy_service() {
 if [ -z "$SERVICE" ]; then
     # Deploy all services
     echo "Deploying all services to PRODUCTION..."
-    deploy_service "agent" "./backend"
+    deploy_service "agent" "./agent"
     deploy_service "api" "./services/api"
     deploy_service "worker" "./services/worker"
 else
     # Deploy single service
     case $SERVICE in
         agent)
-            deploy_service "agent" "./backend"
+            deploy_service "agent" "./agent"
             ;;
         api)
             deploy_service "api" "./services/api"

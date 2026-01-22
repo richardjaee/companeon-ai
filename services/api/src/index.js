@@ -185,6 +185,7 @@ const WALLET_COLLECTION = 'UserWallets';
 
 /**
  * POST /wallet/register-agent - Register wallet with delegation
+ * Stores permission contexts and scopes for ERC-7715 delegation
  */
 app.post('/wallet/register-agent', async (req, res) => {
   try {
@@ -193,42 +194,79 @@ app.post('/wallet/register-agent', async (req, res) => {
       permissionsContext,
       allPermissionContexts,
       delegationManager,
-      chainId = 8453,
+      chainId = 11155111,
       expiresAt,
       smartAccountAddress,
       accountMeta,
       scopes
     } = req.body;
 
-    console.log('registerWalletAgent:', walletAddress?.slice(0, 10));
+    console.log('registerWalletAgent:', walletAddress?.slice(0, 10), 'scopes:', scopes?.length || 0);
 
-    if (!walletAddress || !permissionsContext || !delegationManager) {
+    if (!walletAddress || !permissionsContext) {
       return res.status(400).json({
-        error: 'Missing required: walletAddress, permissionsContext, delegationManager'
+        error: 'Missing required: walletAddress, permissionsContext'
       });
     }
 
     const wallet = walletAddress.toLowerCase();
     const docRef = db.collection(WALLET_COLLECTION).doc(wallet);
 
+    // Parse scopes with human-readable descriptions
+    const parsedScopes = (scopes || []).map(scope => ({
+      type: scope.type,
+      tokenAddress: scope.tokenAddress || null,
+      tokenSymbol: scope.tokenSymbol || (scope.type === 'nativeTokenPeriodTransfer' ? 'ETH' : null),
+      decimals: scope.decimals || (scope.tokenSymbol === 'USDC' || scope.tokenSymbol === 'USDT' ? 6 : 18),
+      // Amount limits
+      periodAmount: scope.periodAmount || null,
+      periodAmountFormatted: scope.periodAmountFormatted || null,
+      periodDuration: scope.periodDuration || null,
+      // Human-readable period description
+      periodDescription: scope.periodDuration === 86400 ? 'per day'
+        : scope.periodDuration === 604800 ? 'per week'
+        : scope.periodDuration === 3600 ? 'per hour'
+        : scope.periodDuration === 2592000 ? 'per month'
+        : scope.periodDuration ? `every ${Math.round(scope.periodDuration / 3600)} hours` : null,
+      frequency: scope.frequency || null,
+      // Per-token expiration
+      expiresAt: scope.expiresAt || null,
+      startTime: scope.startTime || null
+    }));
+
+    // Calculate master expiresAt as the LATEST of all scope expirations
+    const scopeExpirations = parsedScopes.map(s => s.expiresAt).filter(Boolean);
+    const latestExpiration = scopeExpirations.length > 0
+      ? Math.max(...scopeExpirations)
+      : expiresAt;
+
     await docRef.set({
       walletAddress: wallet,
-      permissionsContext,
-      allPermissionContexts: allPermissionContexts || { native: permissionsContext },
-      delegationManager,
-      chainId,
-      expiresAt: expiresAt || null,
       smartAccountAddress: smartAccountAddress || null,
       accountMeta: accountMeta || null,
-      scopes: scopes || [],
-      delegationActive: true,
       registeredAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      // Nested delegation object for agent compatibility
+      delegation: {
+        enabled: true,
+        permissionsContext,
+        allPermissionContexts: allPermissionContexts || { native: permissionsContext },
+        delegationManager,
+        chainId,
+        expiresAt: latestExpiration || null,
+        grantedAt: Date.now(),
+        scopes: parsedScopes,
+        scopeCount: parsedScopes.length
+      },
+      // Also keep flat fields for backwards compatibility
+      delegationActive: true
     }, { merge: true });
 
     res.json({
       success: true,
       walletAddress: wallet,
+      chainId,
+      hasDelegation: true,
       message: 'Wallet delegation registered'
     });
   } catch (error) {
@@ -272,6 +310,7 @@ app.get('/wallet/status', async (req, res) => {
 
 /**
  * GET /wallet/limits - Get wallet spending limits
+ * Returns current spending limits and remaining allowances
  */
 app.get('/wallet/limits', async (req, res) => {
   try {
@@ -285,19 +324,124 @@ app.get('/wallet/limits', async (req, res) => {
     const doc = await db.collection(WALLET_COLLECTION).doc(wallet).get();
 
     if (!doc.exists) {
-      return res.json({ walletAddress: wallet, limits: null });
+      return res.json({
+        success: true,
+        walletAddress: wallet,
+        delegationEnabled: false,
+        status: 'NO_DELEGATION',
+        limits: [],
+        source: 'firestore'
+      });
     }
 
     const data = doc.data();
+
+    // Read from nested delegation object (where register-agent stores it)
+    const delegation = data.delegation || {};
+    const scopes = delegation.scopes || data.scopes || [];
+    const delegationEnabled = delegation.enabled || data.delegationActive || false;
+
+    // Transform scopes to limits format expected by frontend
+    const limits = scopes.map(scope => {
+      // Determine asset symbol - avoid duplicate like "ETH ETH"
+      const asset = scope.tokenSymbol ||
+                   (scope.type === 'nativeTokenPeriodTransfer' ? 'ETH' : 'TOKEN');
+
+      // Use pre-formatted limit if available, otherwise format from raw amount
+      let configuredLimit = scope.periodAmountFormatted || null;
+      if (!configuredLimit && scope.periodAmount) {
+        const decimals = scope.decimals || 18;
+        try {
+          const amountBigInt = BigInt(scope.periodAmount);
+          const divisor = BigInt(10 ** decimals);
+          const formatted = Number(amountBigInt) / Number(divisor);
+          // Don't append asset here since frontend may add it
+          configuredLimit = `${formatted} ${asset}`;
+        } catch (e) {
+          configuredLimit = `${scope.periodAmount} ${asset}`;
+        }
+      }
+      if (!configuredLimit) configuredLimit = '0';
+
+      // Use stored periodDescription (human-readable) or fallback to computing it
+      let frequency = scope.periodDescription || 'daily';
+      if (!scope.periodDescription && scope.periodDuration) {
+        if (scope.periodDuration === 86400) frequency = 'per day';
+        else if (scope.periodDuration === 604800) frequency = 'per week';
+        else if (scope.periodDuration === 3600) frequency = 'per hour';
+        else if (scope.periodDuration === 2592000) frequency = 'per month';
+        else frequency = `every ${Math.round(scope.periodDuration / 3600)} hours`;
+      }
+
+      // Handle expiresAt - could be seconds or milliseconds
+      // Unix timestamps in seconds are typically < 10000000000 (year 2286)
+      let scopeExpiresAt = scope.expiresAt || delegation.expiresAt || null;
+      let startTime = scope.startTime || delegation.grantedAt || data.registeredAt || null;
+
+      // Convert to milliseconds if needed for Date formatting
+      const toMs = (ts) => {
+        if (!ts) return null;
+        // If timestamp is less than year 2100 in seconds, it's in seconds
+        return ts < 4102444800 ? ts * 1000 : ts;
+      };
+
+      // Format dates for display
+      const formatDate = (ts) => {
+        if (!ts) return null;
+        const date = new Date(toMs(ts));
+        return date.toLocaleDateString('en-US', {
+          month: 'numeric',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      };
+
+      return {
+        asset,
+        tokenAddress: scope.tokenAddress || '0x0000000000000000000000000000000000000000',
+        configuredLimit,
+        available: scope.remaining || configuredLimit,
+        frequency, // Human-readable: "per day", "per week", etc.
+        periodDuration: scope.periodDuration || null, // Raw seconds for calculations
+        currentPeriod: '1',
+        status: 'HAS_ALLOWANCE',
+        expiresAt: scopeExpiresAt,
+        expiresAtFormatted: formatDate(scopeExpiresAt),
+        startTime: startTime,
+        startTimeFormatted: formatDate(startTime)
+      };
+    });
+
+    // Calculate overall expiresIn from delegation expiresAt
+    let expiresIn = null;
+    let masterExpiresAt = delegation.expiresAt || data.expiresAt || null;
+    if (masterExpiresAt) {
+      // Handle seconds vs milliseconds
+      const expiryMs = masterExpiresAt < 4102444800 ? masterExpiresAt * 1000 : masterExpiresAt;
+      const now = Date.now();
+      const diffMs = expiryMs - now;
+      if (diffMs > 0) {
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        expiresIn = `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+      } else {
+        expiresIn = 'Expired';
+      }
+    }
+
     res.json({
+      success: true,
       walletAddress: wallet,
-      scopes: data.scopes || [],
-      delegationActive: data.delegationActive || false,
-      expiresAt: data.expiresAt
+      delegationEnabled,
+      status: delegationEnabled ? 'ACTIVE' : 'INACTIVE',
+      limits,
+      expiresAt: masterExpiresAt,
+      expiresIn,
+      grantedAt: delegation.grantedAt || data.registeredAt,
+      source: 'firestore'
     });
   } catch (error) {
     console.error('wallet/limits error:', error);
-    res.status(500).json({ error: 'Failed to get limits' });
+    res.status(500).json({ success: false, error: 'Failed to get limits' });
   }
 });
 

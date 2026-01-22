@@ -10,6 +10,7 @@ set -e
 PROJECT_ID="${GCP_PROJECT:-companeon}"
 REGION="${GCP_REGION:-us-central1}"
 ENV="dev"
+SUFFIX="-dev"
 
 # Colors for output
 RED='\033[0;31m'
@@ -20,6 +21,7 @@ NC='\033[0m' # No Color
 echo -e "${GREEN}Companeon DEV Deployment${NC}"
 echo "Project: ${PROJECT_ID}"
 echo "Region: ${REGION}"
+echo "Environment: ${ENV}"
 echo ""
 
 # Check if gcloud is authenticated
@@ -33,38 +35,35 @@ gcloud config set project ${PROJECT_ID}
 
 SERVICE=$1
 
+# Deploy using --source (Cloud Build) - faster than local docker push
 deploy_service() {
     local service=$1
     local context=$2
-    local image="gcr.io/${PROJECT_ID}/companeon-${service}:${ENV}-latest"
+    local service_name="companeon-${service}${SUFFIX}"
 
-    echo -e "${YELLOW}Building ${service}...${NC}"
-    docker build --platform linux/amd64 -t ${image} ${context}
-
-    echo -e "${YELLOW}Pushing ${service}...${NC}"
-    docker push ${image}
-
-    echo -e "${YELLOW}Deploying ${service}...${NC}"
-    gcloud run deploy companeon-${service}-${ENV} \
-        --image ${image} \
+    echo -e "${YELLOW}Deploying ${service_name} (Cloud Build)...${NC}"
+    gcloud run deploy ${service_name} \
+        --source ${context} \
         --region ${REGION} \
         --platform managed \
+        --allow-unauthenticated \
+        --set-env-vars="NODE_ENV=development,SERVICE_ENV=dev" \
         --quiet
 
-    echo -e "${GREEN}${service} deployed!${NC}"
+    echo -e "${GREEN}${service_name} deployed!${NC}"
 }
 
 if [ -z "$SERVICE" ]; then
     # Deploy all services
-    echo "Deploying all services..."
-    deploy_service "agent" "./backend"
+    echo "Deploying all DEV services..."
+    deploy_service "agent" "./agent"
     deploy_service "api" "./services/api"
     deploy_service "worker" "./services/worker"
 else
     # Deploy single service
     case $SERVICE in
         agent)
-            deploy_service "agent" "./backend"
+            deploy_service "agent" "./agent"
             ;;
         api)
             deploy_service "api" "./services/api"
@@ -84,4 +83,4 @@ echo ""
 echo -e "${GREEN}DEV Deployment complete!${NC}"
 echo ""
 echo "Service URLs:"
-gcloud run services list --region=${REGION} --filter="metadata.name~companeon.*-${ENV}" --format="table(metadata.name,status.url)"
+gcloud run services list --region=${REGION} --filter="metadata.name~companeon-(agent|api|worker)-dev$" --format="table(metadata.name,status.url)"

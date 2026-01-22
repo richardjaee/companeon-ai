@@ -39,7 +39,7 @@ The agent handles routing, gas optimization, transaction simulation, and error r
 ```
 companeon-ai/
 ├── README.md
-├── backend/
+├── agent/
 │   ├── src/
 │   │   ├── index.js                 # Express server
 │   │   ├── agent/
@@ -105,10 +105,10 @@ UI component:
 **Redeeming Permissions (Backend)**
 
 Core implementation:
-- [`backend/src/lib/delegationSigner.js`](./backend/src/lib/delegationSigner.js) - `DelegationSigner` class wraps all transactions in `DelegationManager.redeemDelegations()`, routes ETH vs ERC-20 executions through correct permission contexts
+- [`agent/src/lib/delegationSigner.js`](./agent/src/lib/delegationSigner.js) - `DelegationSigner` class wraps all transactions in `DelegationManager.redeemDelegations()`, routes ETH vs ERC-20 executions through correct permission contexts
 
 Permission-aware tools:
-- [`backend/src/tools/definitions/delegation.js`](./backend/src/tools/definitions/delegation.js) - Agent tools for querying live permission state (`check_delegation_limits`) and diagnosing enforcer errors (`diagnose_delegation_error`)
+- [`agent/src/tools/definitions/delegation.js`](./agent/src/tools/definitions/delegation.js) - Agent tools for querying live permission state (`check_delegation_limits`) and diagnosing enforcer errors (`diagnose_delegation_error`)
 
 ### Agent‑to‑Agent (A2A) Delegation
 
@@ -119,10 +119,10 @@ In addition to direct wallet execution, Companeon supports Agent‑to‑Agent su
 - Execution uses a chained context validated by the DelegationManager
 
 Code links:
-- Sub‑delegation helpers: [`backend/src/lib/subDelegation.js`](./backend/src/lib/subDelegation.js)
-- Transfer Agent tools: [`backend/src/tools/definitions/transfer-agent.js`](./backend/src/tools/definitions/transfer-agent.js)
-- DCA Agent tools: [`backend/src/tools/definitions/dca-agent.js`](./backend/src/tools/definitions/dca-agent.js)
-- Unified list/trigger: [`backend/src/tools/definitions/autonomous-agents.js`](./backend/src/tools/definitions/autonomous-agents.js)
+- Sub‑delegation helpers: [`agent/src/lib/subDelegation.js`](./agent/src/lib/subDelegation.js)
+- Transfer Agent tools: [`agent/src/tools/definitions/transfer-agent.js`](./agent/src/tools/definitions/transfer-agent.js)
+- DCA Agent tools: [`agent/src/tools/definitions/dca-agent.js`](./agent/src/tools/definitions/dca-agent.js)
+- Unified list/trigger: [`agent/src/tools/definitions/autonomous-agents.js`](./agent/src/tools/definitions/autonomous-agents.js)
 
 ### How It Works
 
@@ -145,7 +145,7 @@ Companeon integrates Envio HyperSync for blockchain indexing and wallet history 
 ### Code Links
 
 All Envio tools:
-- [`backend/src/tools/definitions/envio.js`](./backend/src/tools/definitions/envio.js) - Contains 7 agent-callable tools that wrap HyperSync queries
+- [`agent/src/tools/definitions/envio.js`](./agent/src/tools/definitions/envio.js) - Contains 7 agent-callable tools that wrap HyperSync queries
 
 ### How We Use Envio
 
@@ -206,37 +206,37 @@ User Prompt → Express API → Agent (ReAct Loop) → Tools → Blockchain
 
 ### Core Components
 
-**1. Express API Server** ([`backend/src/index.js`](./backend/src/index.js))
+**1. Express API Server** ([`agent/src/index.js`](./agent/src/index.js))
 - RESTful + SSE streaming endpoints
 - Session management (Firestore)
 - Request authentication
 - Chain context management
 
-**2. Agent (ReAct Loop)** ([`backend/src/agent/Agent.js`](./backend/src/agent/Agent.js))
+**2. Agent (ReAct Loop)** ([`agent/src/agent/Agent.js`](./agent/src/agent/Agent.js))
 - Iterative reasoning loop: Think → Act → Observe
 - Tool selection and execution
 - Autonomous error recovery
 - Duplicate call prevention
 - Auto-diagnosis for delegation errors
 
-**3. Tool Registry** ([`backend/src/tools/`](./backend/src/tools/))
+**3. Tool Registry** ([`agent/src/tools/`](./agent/src/tools/))
 - Wallet Tools: Holdings, swaps, transfers
 - DeFi Tools: Uniswap integration, gas estimation
 - Research Tools: Perplexity search (x402), price data
 - Security Tools: GoPlus recipient verification, Envio transaction history
 - Delegation Tools: Limit checking, permission diagnosis
 
-**4. LLM Client** ([`backend/src/llm/GeminiClient.js`](./backend/src/llm/GeminiClient.js))
+**4. LLM Client** ([`agent/src/llm/GeminiClient.js`](./agent/src/llm/GeminiClient.js))
 - Google Gemini 2.5 Flash integration
 - Native function calling
 - Streaming responses
 
-**5. Delegation Signer** ([`backend/src/lib/delegationSigner.js`](./backend/src/lib/delegationSigner.js))
+**5. Delegation Signer** ([`agent/src/lib/delegationSigner.js`](./agent/src/lib/delegationSigner.js))
 - ERC-7715 transaction wrapping
 - MetaMask Smart Accounts Kit integration
 - Permission context management
 
-**6. Session Store** ([`backend/src/memory/FirestoreSessionStore.js`](./backend/src/memory/FirestoreSessionStore.js))
+**6. Session Store** ([`agent/src/memory/FirestoreSessionStore.js`](./agent/src/memory/FirestoreSessionStore.js))
 - Persistent conversation history
 - Memory facts (wallet address, preferences)
 - Pending operation tracking
@@ -377,10 +377,10 @@ Firestore Collections
 
 Relevant files
 
-- Sub‑delegation helpers: `backend/src/lib/subDelegation.js`
-- Transfer Agent tools: `backend/src/tools/definitions/transfer-agent.js`
-- DCA Agent tools: `backend/src/tools/definitions/dca-agent.js`
-- Unified management (list/trigger): `backend/src/tools/definitions/autonomous-agents.js`
+- Sub‑delegation helpers: `agent/src/lib/subDelegation.js`
+- Transfer Agent tools: `agent/src/tools/definitions/transfer-agent.js`
+- DCA Agent tools: `agent/src/tools/definitions/dca-agent.js`
+- Unified management (list/trigger): `agent/src/tools/definitions/autonomous-agents.js`
 
 ---
 

@@ -77,17 +77,23 @@ try {
 // API key check (skip for health, images, and cache-clear endpoints)
 app.use((req, res, next) => {
   // Skip auth for public endpoints
-  if (req.path === '/health' || 
+  if (req.path === '/health' ||
       req.path === '/delegation/clear-cache' ||
       req.path.startsWith('/images/')) {
     return next();
   }
-  
-  const required = process.env.INTERNAL_API_KEY || process.env.AGENT_INTERNAL_API_KEY || '';
-  if (!required) return next(); // Dev mode - no key required
-  
+
+  // Accept internal API key (service-to-service) or gateway API key (from Cloud Endpoints)
+  const internalKey = process.env.INTERNAL_API_KEY || process.env.AGENT_INTERNAL_API_KEY || '';
+  const gatewayKey = process.env.GATEWAY_API_KEY || '';
+
+  if (!internalKey && !gatewayKey) return next(); // Dev mode - no key required
+
   const provided = req.get('x-internal-key') || req.get('x-api-key') || '';
-  if (provided !== required) {
+
+  // Check if provided key matches either internal or gateway key
+  const isValid = (internalKey && provided === internalKey) || (gatewayKey && provided === gatewayKey);
+  if (!isValid) {
     return res.status(401).json({ error: 'unauthorized' });
   }
   next();

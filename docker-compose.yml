@@ -7,7 +7,7 @@ services:
   # Core LLM Agent Service
   agent:
     build:
-      context: ./backend
+      context: ./agent
       dockerfile: Dockerfile
     container_name: companeon-agent
     ports:
@@ -17,7 +17,7 @@ services:
       - PORT=8080
       - SERVICE_NAME=companeon-agent
     env_file:
-      - ./backend/.env
+      - ./agent/.env
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/health"]
       interval: 30s
