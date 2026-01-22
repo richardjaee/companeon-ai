@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PaperAirplaneIcon, XMarkIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, XMarkIcon, Cog6ToothIcon, ClockIcon, PlusIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -151,6 +151,14 @@ export default function CompaneonChatInterface({
   const [isStreamActive, setIsStreamActive] = useState(false);
   const [webSearchEnabled, setWebSearchEnabled] = useState(true);
   const [sessionAuthId, setSessionAuthId] = useState<string | null>(null);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [chatSessions, setChatSessions] = useState<Array<{
+    startedAt: number;
+    lastTimestamp: number;
+    messageCount: number;
+    preview: string | null;
+  }>>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
 
   // Generate unique message ID
   const generateMessageId = () => {
@@ -208,6 +216,121 @@ export default function CompaneonChatInterface({
         });
       }
     }, 100);
+  };
+
+  // Fetch chat history sessions for the sidebar
+  const fetchChatSessions = async () => {
+    if (!address) return;
+
+    setIsLoadingHistory(true);
+    try {
+      const response = await fetch('/api/proxyEndpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: 'CHAT_SESSIONS',
+          method: 'GET',
+          params: { wallet: address }
+        })
+      });
+      const data = await response.json();
+      if (data.sessions) {
+        setChatSessions(data.sessions);
+      }
+    } catch (error) {
+      console.error('Failed to fetch chat sessions:', error);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  // Resume a historical chat session
+  const resumeSession = async (startedAt: number) => {
+    if (!address || isConnecting || isStreamActiveRef.current) return;
+
+    // Abort any ongoing stream
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    setShowHistoryPanel(false);
+    setIsConnecting(true);
+    setMessages([]);
+
+    try {
+      // Resume the session via API (creates new agent session with old messages)
+      const response = await fetch('/api/proxyEndpoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          endpoint: 'CHAT_RESUME',
+          method: 'POST',
+          data: {
+            walletAddress: address,
+            startedAt,
+            chainId: config.chainId
+          }
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.sessionId) {
+        setAgentSessionId(data.sessionId);
+
+        // Fetch the historical messages to display
+        const historyResponse = await fetch('/api/proxyEndpoint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            endpoint: 'CHAT_SESSION',
+            method: 'GET',
+            params: { wallet: address, startedAt }
+          })
+        });
+        const historyData = await historyResponse.json();
+
+        if (historyData.messages) {
+          // Convert historical messages to ChatMessage format
+          const historicalMessages: ChatMessage[] = historyData.messages.map((msg: any, idx: number) => ({
+            id: `hist-${msg.timestamp}-${idx}`,
+            type: msg.role === 'user' ? 'user' : 'assistant',
+            message: msg.content,
+            timestamp: new Date(msg.timestamp).toLocaleTimeString()
+          }));
+
+          setMessages(historicalMessages);
+        }
+
+        setIsConnected(true);
+        setIsConnecting(false);
+      } else {
+        throw new Error('Failed to resume session');
+      }
+    } catch (error) {
+      console.error('Failed to resume session:', error);
+      setConnectionError('Failed to load chat history. Please try again.');
+      setIsConnecting(false);
+    }
+  };
+
+  // Format timestamp for display
+  const formatSessionDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+      return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays === 1) {
+      return `Yesterday at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    } else if (diffDays < 7) {
+      return date.toLocaleDateString([], { weekday: 'long', hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    }
   };
 
   const TOKEN_ADDRESSES = {
@@ -1685,28 +1808,89 @@ export default function CompaneonChatInterface({
     <>
       {/* All messages now appear in chronological order in chat history */}
       
-      <div className="bg-white rounded-[8px] p-6 w-full flex flex-col h-full">
+      <div className="bg-white rounded-[8px] p-6 w-full flex flex-col h-full relative">
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0 mb-4">
         <h2 className="text-xl font-medium">AI Companeon</h2>
         <div className="flex items-center gap-2">
 
           {isConnected && (
-            <button
-              onClick={startNewChat}
-              className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
-              title="Start new chat"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <>
+              {/* History button */}
+              <button
+                onClick={() => {
+                  setShowHistoryPanel(!showHistoryPanel);
+                  if (!showHistoryPanel) {
+                    fetchChatSessions();
+                  }
+                }}
+                className={`text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors ${showHistoryPanel ? 'bg-gray-100 text-gray-600' : ''}`}
+                title="Chat history"
+              >
+                <ClockIcon className="h-5 w-5" />
+              </button>
+
+              {/* New chat button */}
+              <button
+                onClick={startNewChat}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Start new chat"
+              >
+                <PlusIcon className="h-5 w-5" />
+              </button>
+            </>
           )}
         </div>
       </div>
 
+      {/* Chat History Panel */}
+      {showHistoryPanel && (
+        <div className="absolute top-16 right-6 w-72 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+          <div className="p-3 border-b border-gray-100 flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">Chat History</span>
+            <button
+              onClick={() => setShowHistoryPanel(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto max-h-64">
+            {isLoadingHistory ? (
+              <div className="p-4 text-center text-gray-500 text-sm">
+                Loading...
+              </div>
+            ) : chatSessions.length === 0 ? (
+              <div className="p-4 text-center text-gray-500 text-sm">
+                No previous chats
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {chatSessions.map((session, idx) => (
+                  <button
+                    key={session.startedAt}
+                    onClick={() => resumeSession(session.startedAt)}
+                    className="w-full p-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="text-xs text-gray-400 mb-1">
+                      {formatSessionDate(session.startedAt)}
+                    </div>
+                    <div className="text-sm text-gray-700 truncate">
+                      {session.preview || 'Chat session'}
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {session.messageCount} messages
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
-      <div 
+      <div
         ref={chatContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto space-y-4 mb-4 scrollbar-hide"

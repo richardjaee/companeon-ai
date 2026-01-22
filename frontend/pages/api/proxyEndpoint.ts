@@ -12,6 +12,9 @@ export const config = {
 
 
 
+// API service base URL for chat endpoints
+const API_SERVICE_URL = process.env.API_SERVICE_URL || 'https://companeon-api-440170696844.us-central1.run.app';
+
 const endpointMap: { [key: string]: string | undefined } = {
   GET_TOKENS: process.env.GET_TOKENS_URL,
   GET_NFTS: process.env.GET_NFTS_URL,
@@ -33,7 +36,14 @@ const endpointMap: { [key: string]: string | undefined } = {
   REGISTER_WALLET_AGENT_URL: process.env.REGISTER_WALLET_AGENT_URL,
   GET_WALLET_NONCE_FOR_ACTION_URL: process.env.GET_WALLET_NONCE_FOR_ACTION_URL,
   VERIFY_WALLET_ACTION_URL: process.env.VERIFY_WALLET_ACTION_URL,
-  GET_WALLET_LIMITS_URL: process.env.GET_WALLET_LIMITS_URL
+  GET_WALLET_LIMITS_URL: process.env.GET_WALLET_LIMITS_URL,
+
+  // Chat history endpoints
+  CHAT_SESSIONS: `${API_SERVICE_URL}/chat/sessions`,
+  CHAT_HISTORY: `${API_SERVICE_URL}/chat/history`,
+  CHAT_SESSION: `${API_SERVICE_URL}/chat/session`,
+  CHAT_RESUME: `${API_SERVICE_URL}/chat/resume`,
+  TRANSACTIONS_HISTORY: `${API_SERVICE_URL}/transactions/history`
 };
 
 interface ProxyRequestBody {
@@ -162,6 +172,12 @@ export default async function handler(
 
   if (!url.startsWith('http')) {
     return res.status(200).json({ contractAddress: url });
+  }
+
+  // Handle CHAT_SESSION endpoint which needs startedAt in the URL path
+  if (endpoint === 'CHAT_SESSION' && params?.startedAt) {
+    url = `${url}/${params.startedAt}`;
+    delete params.startedAt;  // Remove from query params since it's now in the path
   }
 
   const headers: Record<string, string> = {

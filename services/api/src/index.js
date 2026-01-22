@@ -729,6 +729,301 @@ app.get('/agent/logs', async (req, res) => {
 });
 
 // ========================================
+// CHAT HISTORY ENDPOINTS
+// ========================================
+
+const WALLET_CHATS_COLLECTION = 'wallet_chats';
+const WALLET_TX_COLLECTION = 'wallet_transactions';
+
+/**
+ * GET /chat/history - Get permanent chat history for a wallet
+ * Query params: wallet (required), limit (default 100), offset (default 0)
+ */
+app.get('/chat/history', async (req, res) => {
+  try {
+    const walletAddress = req.query.wallet || req.query.walletAddress;
+    const limit = parseInt(req.query.limit) || 100;
+    const offset = parseInt(req.query.offset) || 0;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'wallet query param required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const doc = await db.collection(WALLET_CHATS_COLLECTION).doc(wallet).get();
+
+    if (!doc.exists) {
+      return res.json({ messages: [], total: 0, wallet });
+    }
+
+    const data = doc.data();
+    const allMessages = data.messages || [];
+    const total = allMessages.length;
+
+    // Return paginated slice (most recent first)
+    const sorted = [...allMessages].reverse();
+    const messages = sorted.slice(offset, offset + limit);
+
+    res.json({
+      messages,
+      total,
+      wallet,
+      hasMore: offset + limit < total
+    });
+  } catch (error) {
+    console.error('chat/history error:', error);
+    res.status(500).json({ error: 'Failed to get chat history' });
+  }
+});
+
+/**
+ * GET /chat/sessions - Get chat sessions summary for sidebar display
+ * Groups messages into sessions based on 30-minute gaps
+ */
+app.get('/chat/sessions', async (req, res) => {
+  try {
+    const walletAddress = req.query.wallet || req.query.walletAddress;
+    const limit = parseInt(req.query.limit) || 20;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'wallet query param required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const doc = await db.collection(WALLET_CHATS_COLLECTION).doc(wallet).get();
+
+    if (!doc.exists) {
+      return res.json({ sessions: [], wallet });
+    }
+
+    const data = doc.data();
+    const messages = data.messages || [];
+
+    // Group messages into "sessions" based on time gaps (>30 min = new session)
+    const sessions = [];
+    let currentSession = null;
+    const SESSION_GAP_MS = 30 * 60 * 1000; // 30 minutes
+
+    for (const msg of messages) {
+      if (!currentSession || msg.timestamp - currentSession.lastTimestamp > SESSION_GAP_MS) {
+        if (currentSession) sessions.push(currentSession);
+        currentSession = {
+          startedAt: msg.timestamp,
+          lastTimestamp: msg.timestamp,
+          messageCount: 1,
+          preview: msg.role === 'user' ? msg.content.slice(0, 100) : null
+        };
+      } else {
+        currentSession.lastTimestamp = msg.timestamp;
+        currentSession.messageCount++;
+        if (!currentSession.preview && msg.role === 'user') {
+          currentSession.preview = msg.content.slice(0, 100);
+        }
+      }
+    }
+    if (currentSession) sessions.push(currentSession);
+
+    // Return most recent sessions first
+    const sortedSessions = sessions.reverse().slice(0, limit);
+
+    res.json({
+      sessions: sortedSessions,
+      wallet,
+      totalSessions: sessions.length
+    });
+  } catch (error) {
+    console.error('chat/sessions error:', error);
+    res.status(500).json({ error: 'Failed to get chat sessions' });
+  }
+});
+
+/**
+ * GET /chat/session/:startedAt - Get messages from a specific historical session
+ * Query params: wallet (required)
+ */
+app.get('/chat/session/:startedAt', async (req, res) => {
+  try {
+    const walletAddress = req.query.wallet || req.query.walletAddress;
+    const startedAt = parseInt(req.params.startedAt);
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'wallet query param required' });
+    }
+
+    if (!startedAt || isNaN(startedAt)) {
+      return res.status(400).json({ error: 'valid startedAt timestamp required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const doc = await db.collection(WALLET_CHATS_COLLECTION).doc(wallet).get();
+
+    if (!doc.exists) {
+      return res.json({ messages: [], startedAt, endedAt: null, wallet });
+    }
+
+    const data = doc.data();
+    const allMessages = data.messages || [];
+    const SESSION_GAP_MS = 30 * 60 * 1000;
+
+    // Find session boundaries
+    const startIdx = allMessages.findIndex(m => m.timestamp >= startedAt);
+    if (startIdx === -1) {
+      return res.json({ messages: [], startedAt, endedAt: null, wallet });
+    }
+
+    // Find where session ends (30+ min gap or end of messages)
+    let endedAt = startedAt;
+    const sessionMessages = [];
+
+    for (let i = startIdx; i < allMessages.length; i++) {
+      const msg = allMessages[i];
+      if (sessionMessages.length > 0 && msg.timestamp - endedAt > SESSION_GAP_MS) {
+        break;
+      }
+      sessionMessages.push(msg);
+      endedAt = msg.timestamp;
+    }
+
+    res.json({
+      messages: sessionMessages,
+      startedAt,
+      endedAt,
+      wallet,
+      messageCount: sessionMessages.length
+    });
+  } catch (error) {
+    console.error('chat/session error:', error);
+    res.status(500).json({ error: 'Failed to get session messages' });
+  }
+});
+
+/**
+ * POST /chat/resume - Resume a historical session
+ * Creates a new agent session pre-loaded with messages from an old conversation
+ * Body: { walletAddress, startedAt, chainId? }
+ * Returns: { sessionId, loaded, ... }
+ */
+app.post('/chat/resume', async (req, res) => {
+  try {
+    const { walletAddress, startedAt, chainId = 8453 } = req.body;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'walletAddress required' });
+    }
+
+    if (!startedAt) {
+      return res.status(400).json({ error: 'startedAt timestamp required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+
+    // Generate new session ID
+    const sessionId = `${wallet}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+
+    // Get historical messages
+    const doc = await db.collection(WALLET_CHATS_COLLECTION).doc(wallet).get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'No chat history found for this wallet' });
+    }
+
+    const data = doc.data();
+    const allMessages = data.messages || [];
+    const SESSION_GAP_MS = 30 * 60 * 1000;
+
+    // Find session boundaries
+    const startIdx = allMessages.findIndex(m => m.timestamp >= startedAt);
+    if (startIdx === -1) {
+      return res.status(404).json({ error: 'No messages found for this session' });
+    }
+
+    // Collect session messages
+    let endedAt = startedAt;
+    const sessionMessages = [];
+
+    for (let i = startIdx; i < allMessages.length; i++) {
+      const msg = allMessages[i];
+      if (sessionMessages.length > 0 && msg.timestamp - endedAt > SESSION_GAP_MS) {
+        break;
+      }
+      sessionMessages.push({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp
+      });
+      endedAt = msg.timestamp;
+    }
+
+    // Keep last 50 for LLM context
+    const trimmedMessages = sessionMessages.slice(-50);
+
+    // Create agent session with pre-loaded messages
+    await db.collection('agent_sessions').doc(sessionId).set({
+      id: sessionId,
+      createdAt: Date.now(),
+      lastAccessedAt: Date.now(),
+      messages: trimmedMessages,
+      facts: {
+        walletAddress: wallet,
+        chainId,
+        resumedFrom: startedAt
+      }
+    });
+
+    // Check wallet delegation
+    const walletDoc = await db.collection(WALLET_COLLECTION).doc(wallet).get();
+    const hasDelegation = walletDoc.exists && walletDoc.data()?.delegationActive;
+
+    res.json({
+      sessionId,
+      agentSessionId: sessionId,
+      walletAddress: wallet,
+      chainId,
+      hasDelegation,
+      loaded: trimmedMessages.length,
+      resumedFrom: startedAt,
+      originalSessionEnd: endedAt
+    });
+  } catch (error) {
+    console.error('chat/resume error:', error);
+    res.status(500).json({ error: 'Failed to resume session' });
+  }
+});
+
+/**
+ * GET /transactions/history - Get transaction audit log for a wallet
+ */
+app.get('/transactions/history', async (req, res) => {
+  try {
+    const walletAddress = req.query.wallet || req.query.walletAddress;
+    const limit = parseInt(req.query.limit) || 50;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'wallet query param required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const snapshot = await db.collection(WALLET_TX_COLLECTION)
+      .doc(wallet)
+      .collection('logs')
+      .orderBy('timestamp', 'desc')
+      .limit(limit)
+      .get();
+
+    const transactions = snapshot.docs.map(doc => doc.data());
+
+    res.json({
+      transactions,
+      wallet,
+      count: transactions.length
+    });
+  } catch (error) {
+    console.error('transactions/history error:', error);
+    res.status(500).json({ error: 'Failed to get transaction history' });
+  }
+});
+
+// ========================================
 // AGENT SESSION ENDPOINTS (Legacy routes)
 // ========================================
 

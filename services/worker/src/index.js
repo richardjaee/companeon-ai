@@ -143,8 +143,8 @@ if (process.env.ENABLE_DCA_AGENT !== 'false') {
   console.log('DCA agent job scheduled (every hour)');
 }
 
-// Cleanup expired auth/sessions every 6 hours
-cron.schedule('0 */6 * * *', async () => {
+// Cleanup expired auth/sessions every 30 minutes (matches session TTL)
+cron.schedule('*/30 * * * *', async () => {
   console.log('Running scheduled cleanup...');
   cleanupJobStatus.status = 'running';
   try {
@@ -156,7 +156,7 @@ cron.schedule('0 */6 * * *', async () => {
     console.error('Scheduled cleanup error:', error);
   }
 });
-console.log('Cleanup job scheduled (every 6 hours)');
+console.log('Cleanup job scheduled (every 30 minutes)');
 
 // ========================================
 // Start Server

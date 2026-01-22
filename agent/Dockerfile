@@ -1,11 +1,14 @@
 FROM node:20-alpine
 
+# Install build dependencies for native modules
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
 ENV NODE_ENV=production
 
 COPY package.json ./
-RUN npm install --omit=dev
+RUN npm install --omit=dev && rm -rf /root/.npm /tmp/*
 
 COPY src ./src
 

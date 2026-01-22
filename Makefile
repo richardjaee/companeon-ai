@@ -70,30 +70,41 @@ install:
 	cd services/worker && npm install
 
 # Quick Deploy DEV - uses Cloud Build (no local docker push, faster)
+# Note: Env vars are preserved between deployments. To update env vars, use:
+#   gcloud run services update SERVICE --update-env-vars="KEY=VALUE"
 deploy-agent-dev:
-	@echo "Deploying agent-dev via Cloud Build..."
-	gcloud run deploy companeon-agent-dev --source ./agent --region us-central1 --allow-unauthenticated --set-env-vars="NODE_ENV=development" --quiet
+	@echo "Deploying agent-dev via Cloud Build (preserving env vars)..."
+	gcloud run deploy companeon-agent-dev --source ./agent --region us-central1 --allow-unauthenticated --quiet
 
 deploy-api-dev:
-	@echo "Deploying api-dev via Cloud Build..."
-	gcloud run deploy companeon-api-dev --source ./services/api --region us-central1 --allow-unauthenticated --set-env-vars="NODE_ENV=development" --quiet
+	@echo "Deploying api-dev via Cloud Build (preserving env vars)..."
+	gcloud run deploy companeon-api-dev --source ./services/api --region us-central1 --allow-unauthenticated --quiet
 
 deploy-worker-dev:
-	@echo "Deploying worker-dev via Cloud Build..."
-	gcloud run deploy companeon-worker-dev --source ./services/worker --region us-central1 --set-env-vars="NODE_ENV=development" --quiet
+	@echo "Deploying worker-dev via Cloud Build (preserving env vars)..."
+	gcloud run deploy companeon-worker-dev --source ./services/worker --region us-central1 --quiet
 
 # Quick Deploy PROD - uses Cloud Build
 deploy-agent:
-	@echo "Deploying agent (PROD) via Cloud Build..."
+	@echo "Deploying agent (PROD) via Cloud Build (preserving env vars)..."
 	gcloud run deploy companeon-agent --source ./agent --region us-central1 --allow-unauthenticated --quiet
 
 deploy-api:
-	@echo "Deploying API (PROD) via Cloud Build..."
+	@echo "Deploying API (PROD) via Cloud Build (preserving env vars)..."
 	gcloud run deploy companeon-api --source ./services/api --region us-central1 --allow-unauthenticated --quiet
 
 deploy-worker:
-	@echo "Deploying worker (PROD) via Cloud Build..."
+	@echo "Deploying worker (PROD) via Cloud Build (preserving env vars)..."
 	gcloud run deploy companeon-worker --source ./services/worker --region us-central1 --quiet
+
+# Update env vars without redeploying code
+update-env-agent-dev:
+	@echo "Updating agent-dev env vars..."
+	gcloud run services update companeon-agent-dev --region us-central1 --update-env-vars="$(VARS)"
+
+update-env-api-dev:
+	@echo "Updating api-dev env vars..."
+	gcloud run services update companeon-api-dev --region us-central1 --update-env-vars="$(VARS)"
 
 # Full Deployment
 deploy-dev:

@@ -266,6 +266,11 @@ app.post('/sessions/:id/messages/stream', async (req, res) => {
   // Add message to history (Firestore - async)
   await sessionStore.appendMessage(sessionId, role, content);
 
+  // Save to permanent wallet history (never expires)
+  if (walletAddress) {
+    await sessionStore.saveToWalletHistory(walletAddress, role, content, { sessionId });
+  }
+
   // Set up SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -356,7 +361,31 @@ app.post('/sessions/:id/messages/stream', async (req, res) => {
       }
       
       await sessionStore.appendMessage(sessionId, 'assistant', messageContent);
-      
+
+      // Save to permanent wallet history
+      if (walletAddress) {
+        await sessionStore.saveToWalletHistory(walletAddress, 'assistant', messageContent, {
+          sessionId,
+          toolsCalled: result.toolResults?.map(t => t.tool) || []
+        });
+
+        // Log blockchain transactions for audit trail
+        const txTools = ['swap', 'transfer', 'executeSwap', 'sendTransfer'];
+        for (const toolResult of (result.toolResults || [])) {
+          if (txTools.includes(toolResult.tool)) {
+            await sessionStore.logTransaction(walletAddress, {
+              tool: toolResult.tool,
+              params: toolResult.params,
+              result: toolResult.output,
+              txHash: toolResult.output?.txHash || toolResult.output?.transactionHash,
+              chainId: effectiveChainId,
+              status: toolResult.ok ? 'completed' : 'failed',
+              error: toolResult.ok ? null : toolResult.error
+            });
+          }
+        }
+      }
+
       // Track what we asked so LLM has context for "yes" responses
       // No pattern matching - LLM interprets meaning from chat history + memory facts
       const trimmed = result.response.trim();

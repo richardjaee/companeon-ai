@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Logs
 logs
@@ -23,6 +24,9 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# Skills (local CLI tools)
+.skills/
 
 # Build outputs
 dist/
