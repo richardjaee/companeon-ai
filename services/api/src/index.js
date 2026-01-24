@@ -475,6 +475,80 @@ app.delete('/wallet/revoke', async (req, res) => {
 // ASSETS ENDPOINTS
 // ========================================
 
+// Price cache TTL (5 minutes)
+const PRICE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+/**
+ * Get prices for a list of token symbols, using Firestore cache with lazy CMC refresh
+ */
+async function getTokenPrices(db, symbols) {
+  if (!symbols.length) return {};
+
+  // Read current cache
+  const cacheDoc = await db.collection('PriceCache').doc('latest').get();
+  const cached = cacheDoc.exists ? cacheDoc.data() : { prices: {}, updatedAt: 0 };
+  const cacheAge = Date.now() - (cached.updatedAt || 0);
+
+  // If cache is fresh, return cached prices for requested symbols
+  if (cacheAge < PRICE_CACHE_TTL_MS) {
+    const result = {};
+    for (const sym of symbols) {
+      if (cached.prices[sym]) result[sym] = cached.prices[sym];
+    }
+    return result;
+  }
+
+  // Cache is stale - refresh from CMC
+  const cmcApiKey = process.env.CMC_API_KEY;
+  if (!cmcApiKey) {
+    // No API key, return stale cache
+    const result = {};
+    for (const sym of symbols) {
+      if (cached.prices[sym]) result[sym] = cached.prices[sym];
+    }
+    return result;
+  }
+
+  try {
+    const symbolList = symbols.join(',');
+    const response = await fetch(
+      `https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${symbolList}&convert=USD`,
+      { headers: { 'X-CMC_PRO_API_KEY': cmcApiKey } }
+    );
+    const json = await response.json();
+
+    const prices = { ...cached.prices };
+    if (json.data) {
+      for (const sym of symbols) {
+        const tokenData = json.data[sym];
+        if (tokenData) {
+          const quote = Array.isArray(tokenData) ? tokenData[0]?.quote?.USD : tokenData.quote?.USD;
+          if (quote) {
+            prices[sym] = {
+              usd: quote.price,
+              change24h: quote.percent_change_24h,
+              marketCap: quote.market_cap,
+              volume24h: quote.volume_24h
+            };
+          }
+        }
+      }
+    }
+
+    // Update cache
+    await db.collection('PriceCache').doc('latest').set({
+      prices,
+      updatedAt: Date.now(),
+      source: 'coinmarketcap'
+    });
+
+    return prices;
+  } catch (error) {
+    console.error('CMC price fetch failed:', error.message);
+    return cached.prices || {};
+  }
+}
+
 // Alchemy RPC URLs by chain
 const ALCHEMY_URLS = {
   8453: process.env.ALCHEMY_RPC_URL || 'https://base-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY,
@@ -523,20 +597,15 @@ app.post('/assets/tokens', async (req, res) => {
     });
     const tokensData = await tokensResponse.json();
 
-    // Get price cache for USD values
-    const priceDoc = await db.collection('PriceCache').doc('latest').get();
-    const prices = priceDoc.exists ? priceDoc.data().prices || {} : {};
-    const ethPrice = prices.ETH?.usd || 0;
-
-    // Process token balances with metadata
+    // Process token balances and collect symbols for price lookup
     const tokenBalances = tokensData.result?.tokenBalances || [];
     const tokens = [];
+    const symbolsNeeded = ['ETH'];
 
-    for (const token of tokenBalances.slice(0, 20)) { // Limit to 20 tokens
+    for (const token of tokenBalances.slice(0, 20)) {
       if (token.tokenBalance === '0x0' || token.tokenBalance === '0x0000000000000000000000000000000000000000000000000000000000000000') continue;
 
       try {
-        // Get token metadata
         const metaResponse = await fetch(alchemyUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -555,21 +624,31 @@ app.post('/assets/tokens', async (req, res) => {
         const balance = BigInt(token.tokenBalance || '0');
         const formattedBalance = ethers.formatUnits(balance, meta.decimals || 18);
         const symbol = meta.symbol || 'UNKNOWN';
-        const priceUsd = prices[symbol]?.usd || 0;
-        const totalValue = (parseFloat(formattedBalance) * priceUsd).toFixed(2);
+
+        if (symbol !== 'UNKNOWN') symbolsNeeded.push(symbol);
 
         tokens.push({
           contract: token.contractAddress,
           symbol,
           name: meta.name || 'Unknown Token',
           balance: formattedBalance,
-          priceInUSD: priceUsd,
-          totalValueInUSD: totalValue,
+          decimals: meta.decimals || 18,
           logo: meta.logo || null
         });
       } catch (e) {
         // Skip tokens that fail metadata fetch
       }
+    }
+
+    // Lazy-load prices for all symbols found in wallet
+    const prices = await getTokenPrices(db, [...new Set(symbolsNeeded)]);
+    const ethPrice = prices.ETH?.usd || 0;
+
+    // Attach prices to tokens
+    for (const token of tokens) {
+      const priceUsd = prices[token.symbol]?.usd || 0;
+      token.priceInUSD = priceUsd;
+      token.totalValueInUSD = (parseFloat(token.balance) * priceUsd).toFixed(2);
     }
 
     res.json({
@@ -645,40 +724,18 @@ app.post('/assets/nfts', async (req, res) => {
 // ========================================
 
 /**
- * GET /prices/cache - Get cached prices
+ * GET /prices/cache - Get cached prices (lazy-loaded from CMC on demand)
  */
 app.get('/prices/cache', async (req, res) => {
   try {
     const doc = await db.collection('PriceCache').doc('latest').get();
-
     if (!doc.exists) {
       return res.json({ prices: {}, updatedAt: null });
     }
-
     res.json(doc.data());
   } catch (error) {
     console.error('prices/cache error:', error);
     res.status(500).json({ error: 'Failed to get prices' });
-  }
-});
-
-/**
- * GET /prices/range - Get historical prices
- */
-app.get('/prices/range', async (req, res) => {
-  try {
-    const { token, from, to } = req.query;
-
-    // TODO: Query PriceHistory collection for range
-    res.json({
-      token,
-      from,
-      to,
-      prices: []
-    });
-  } catch (error) {
-    console.error('prices/range error:', error);
-    res.status(500).json({ error: 'Failed to get price history' });
   }
 });
 
