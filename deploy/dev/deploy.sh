@@ -34,20 +34,68 @@ fi
 gcloud config set project ${PROJECT_ID}
 
 SERVICE=$1
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Deploy using --source (Cloud Build) - faster than local docker push
-deploy_service() {
-    local service=$1
-    local context=$2
-    local service_name="companeon-${service}${SUFFIX}"
+# Agent secrets from Secret Manager
+AGENT_SECRETS="GOOGLE_GENAI_API_KEY=google-genai-api-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},BACKEND_DELEGATION_KEY=backend-delegation-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},PRIVATE_KEY=agent-private-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},CMC_API_KEY=cmc-api-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},PPLX_API_KEY=pplx-api-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},ENVIO_API_KEY=envio-api-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},GATEWAY_API_KEY=gateway-api-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},INTERNAL_API_KEY=internal-api-key:latest"
+AGENT_SECRETS="${AGENT_SECRETS},ALCHEMY_RPC_URL=alchemy-rpc-url:latest"
 
-    echo -e "${YELLOW}Deploying ${service_name} (Cloud Build)...${NC}"
+# Non-sensitive env vars (PORT is set automatically by Cloud Run)
+AGENT_ENV="SIGNER_MODE=DELEGATION,LOG_LEVEL=info,GOOGLE_CLOUD_PROJECT=companeon"
+API_ENV="NODE_ENV=development,GOOGLE_CLOUD_PROJECT=companeon"
+WORKER_ENV="NODE_ENV=development,GOOGLE_CLOUD_PROJECT=companeon"
+
+# Deploy agent with secrets from Secret Manager
+deploy_agent() {
+    local service_name="companeon-agent${SUFFIX}"
+    echo -e "${YELLOW}Deploying ${service_name} (with Secret Manager)...${NC}"
+
     gcloud run deploy ${service_name} \
-        --source ${context} \
+        --source ./agent \
         --region ${REGION} \
         --platform managed \
         --allow-unauthenticated \
-        --set-env-vars="NODE_ENV=development,SERVICE_ENV=dev" \
+        --update-secrets="${AGENT_SECRETS}" \
+        --update-env-vars="${AGENT_ENV}" \
+        --quiet
+
+    echo -e "${GREEN}${service_name} deployed!${NC}"
+}
+
+# Deploy API service
+deploy_api() {
+    local service_name="companeon-api${SUFFIX}"
+    echo -e "${YELLOW}Deploying ${service_name}...${NC}"
+
+    gcloud run deploy ${service_name} \
+        --source ./services/api \
+        --region ${REGION} \
+        --platform managed \
+        --allow-unauthenticated \
+        --update-env-vars="${API_ENV}" \
+        --quiet
+
+    echo -e "${GREEN}${service_name} deployed!${NC}"
+}
+
+# Deploy worker service
+deploy_worker() {
+    local service_name="companeon-worker${SUFFIX}"
+    echo -e "${YELLOW}Deploying ${service_name}...${NC}"
+
+    gcloud run deploy ${service_name} \
+        --source ./services/worker \
+        --region ${REGION} \
+        --platform managed \
+        --update-env-vars="${WORKER_ENV}" \
         --quiet
 
     echo -e "${GREEN}${service_name} deployed!${NC}"
@@ -56,20 +104,20 @@ deploy_service() {
 if [ -z "$SERVICE" ]; then
     # Deploy all services
     echo "Deploying all DEV services..."
-    deploy_service "agent" "./agent"
-    deploy_service "api" "./services/api"
-    deploy_service "worker" "./services/worker"
+    deploy_agent
+    deploy_api
+    deploy_worker
 else
     # Deploy single service
     case $SERVICE in
         agent)
-            deploy_service "agent" "./agent"
+            deploy_agent
             ;;
         api)
-            deploy_service "api" "./services/api"
+            deploy_api
             ;;
         worker)
-            deploy_service "worker" "./services/worker"
+            deploy_worker
             ;;
         *)
             echo -e "${RED}Unknown service: $SERVICE${NC}"

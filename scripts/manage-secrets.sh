@@ -152,6 +152,64 @@ case "$1" in
         echo -e "${GREEN}Setup complete!${NC}"
         ;;
 
+    sync)
+        # Sync secrets from .env file to Secret Manager
+        ENV_FILE="${2:-agent/.env}"
+        if [ ! -f "$ENV_FILE" ]; then
+            echo -e "${RED}Error: $ENV_FILE not found${NC}"
+            exit 1
+        fi
+
+        echo -e "${BLUE}Syncing secrets from $ENV_FILE to Secret Manager...${NC}"
+        echo ""
+
+        # Define which env vars are sensitive and should be secrets
+        # Format: ENV_VAR_NAME:secret-name-in-gcp
+        SECRET_PAIRS="
+            GOOGLE_GENAI_API_KEY:google-genai-api-key
+            BACKEND_DELEGATION_KEY:backend-delegation-key
+            PRIVATE_KEY:agent-private-key
+            PRIVATE_KEY_ETH:agent-private-key-eth
+            GAS_SPONSOR_KEY:gas-sponsor-key
+            CMC_API_KEY:cmc-api-key
+            PPLX_API_KEY:pplx-api-key
+            ENVIO_API_KEY:envio-api-key
+            ZEROX_API_KEY:zerox-api-key
+            GATEWAY_API_KEY:gateway-api-key
+            INTERNAL_API_KEY:internal-api-key
+            ALCHEMY_RPC_URL:alchemy-rpc-url
+            SEPOLIA_RPC_URL:sepolia-rpc-url
+        "
+
+        for pair in $SECRET_PAIRS; do
+            env_var=$(echo "$pair" | cut -d':' -f1)
+            secret_name=$(echo "$pair" | cut -d':' -f2)
+            value=$(grep "^${env_var}=" "$ENV_FILE" | cut -d'=' -f2-)
+
+            if [ -n "$value" ]; then
+                if gcloud secrets describe "$secret_name" >/dev/null 2>&1; then
+                    # Check if value changed
+                    current=$(gcloud secrets versions access latest --secret="$secret_name" 2>/dev/null || echo "")
+                    if [ "$current" != "$value" ]; then
+                        echo -n "$value" | gcloud secrets versions add "$secret_name" --data-file=- --quiet
+                        echo -e "${GREEN}Updated${NC} $secret_name"
+                    else
+                        echo -e "${BLUE}Unchanged${NC} $secret_name"
+                    fi
+                else
+                    echo -n "$value" | gcloud secrets create "$secret_name" --data-file=- --quiet
+                    echo -e "${GREEN}Created${NC} $secret_name"
+                fi
+            fi
+        done
+
+        echo ""
+        echo -e "${GREEN}Sync complete!${NC}"
+        echo ""
+        echo "Grant Cloud Run service account access to secrets:"
+        echo -e "${YELLOW}  make grant-secrets${NC}"
+        ;;
+
     *)
         echo "Companeon Secret Manager"
         echo ""
