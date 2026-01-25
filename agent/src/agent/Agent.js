@@ -188,43 +188,51 @@ export class Agent {
       try {
         let response;
         
-        // If we just processed tools, try streaming for the final response
-        // This gives us true streaming for the user-facing response
-        if (justProcessedTools && this.llm.chatStream) {
+        // Try streaming for all responses - gives real-time output
+        // If tool calls appear, we'll retract and continue
+        if (this.llm.chatStream) {
           this.logger?.info?.('attempting_stream_response', { iteration });
-          
+
           try {
-            // Collect chunks first, don't emit until we know there are no tool calls
+            // Stream chunks in real-time (optimistic - assume final response)
             let collectedContent = '';
-            const collectedChunks = [];
-            
+            let streamStarted = false;
+
             response = await this.llm.chatStream({
               messages,
               tools: this.tools.getSchemas(),
               onChunk: (chunk) => {
                 collectedContent += chunk;
-                collectedChunks.push(chunk);
-              }
-            });
-            
-            // Now check: is this a final response or does it have tool calls?
-            if (!response.toolCalls || response.toolCalls.length === 0) {
-              // FINAL RESPONSE - now emit as ask_delta
-              emit({ type: 'ask_start' });
-              for (const chunk of collectedChunks) {
+                // Emit ask_start on first chunk
+                if (!streamStarted) {
+                  emit({ type: 'ask_start' });
+                  streamStarted = true;
+                }
+                // Emit chunk immediately for real-time streaming
                 emit({ type: 'ask_delta', text: chunk });
               }
+            });
+
+            // Check if this was actually the final response
+            if (!response.toolCalls || response.toolCalls.length === 0) {
+              // FINAL RESPONSE - emit the complete message
               finalResponse = response.content || collectedContent;
               emit({ type: 'ask', message: finalResponse });
               break;
             }
-            
-            // HAS TOOL CALLS - this was "thinking", emit as thinking_delta if there's content
+
+            // HAS TOOL CALLS - we streamed prematurely, tell frontend to discard
+            // Emit a retract event so frontend knows this wasn't the final response
+            if (streamStarted) {
+              emit({ type: 'ask_retract' });
+              this.logger?.info?.('retracted_premature_stream', { length: collectedContent.length });
+            }
+
+            // Also emit as thinking for context
             if (collectedContent.trim()) {
               emit({ type: 'thinking_delta', text: collectedContent.trim() });
-              this.logger?.info?.('emitted_thinking', { length: collectedContent.length });
             }
-            
+
             this.logger?.info?.('stream_produced_tool_calls', { count: response.toolCalls.length });
             // Fall through to tool handling below
             

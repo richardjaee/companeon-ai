@@ -282,14 +282,18 @@ app.post('/sessions/:id/messages/stream', async (req, res) => {
     try {
       // Log key events for debugging streaming issues
       if (['ask_start', 'ask', 'ask_delta', 'done', 'tx_message'].includes(event.type)) {
-        logger.info('sse_event', { 
-          type: event.type, 
+        logger.info('sse_event', {
+          type: event.type,
           hasMessage: !!event.message,
           messageLength: event.message?.length,
           textLength: event.text?.length
         });
       }
       res.write(`data: ${JSON.stringify(event)}\n\n`);
+      // Flush immediately for real-time streaming (prevents Cloud Run/proxy buffering)
+      if (typeof res.flush === 'function') {
+        res.flush();
+      }
     } catch (e) {
       logger.warn('sse_write_error', { type: event.type, error: e.message });
     }

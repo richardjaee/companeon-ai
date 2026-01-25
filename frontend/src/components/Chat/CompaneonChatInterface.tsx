@@ -1429,6 +1429,20 @@ export default function CompaneonChatInterface({
                 }
                 return newMessages;
               });
+            } else if (event.type === 'ask_retract') {
+              // Backend discovered tool calls after streaming started - discard streamed content
+              streamingMessageContent = '';
+              receivedAskStart = false;
+
+              // Remove any streaming message from UI
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMsg = newMessages[newMessages.length - 1];
+                if (lastMsg && lastMsg.type === 'assistant' && lastMsg.isStreaming) {
+                  newMessages.pop();
+                }
+                return newMessages;
+              });
             } else if (event.type === 'ask_delta') {
               // Real-time streaming: Append chunks immediately as they arrive
               const token = event.text || '';
