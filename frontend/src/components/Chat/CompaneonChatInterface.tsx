@@ -159,6 +159,7 @@ export default function CompaneonChatInterface({
     preview: string | null;
   }>>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const lastHistoryFetchRef = useRef<number>(0);
 
   // Generate unique message ID
   const generateMessageId = () => {
@@ -180,6 +181,7 @@ export default function CompaneonChatInterface({
 
     // Reset session ID to force new session creation
     setAgentSessionId(null);
+    lastHistoryFetchRef.current = 0;
 
     setMessages([]);
     setIsConnected(false);
@@ -235,7 +237,9 @@ export default function CompaneonChatInterface({
       });
       const data = await response.json();
       if (data.sessions) {
-        setChatSessions(data.sessions);
+        const sorted = [...data.sessions].sort((a, b) => b.startedAt - a.startedAt);
+        setChatSessions(sorted);
+        lastHistoryFetchRef.current = Date.now();
       }
     } catch (error) {
       console.error('Failed to fetch chat sessions:', error);
@@ -292,12 +296,12 @@ export default function CompaneonChatInterface({
         const historyData = await historyResponse.json();
 
         if (historyData.messages) {
-          // Convert historical messages to ChatMessage format
+            // Convert historical messages to ChatMessage format
           const historicalMessages: ChatMessage[] = historyData.messages.map((msg: any, idx: number) => ({
-            id: `hist-${msg.timestamp}-${idx}`,
+            id: `hist-${msg.timestamp || idx}-${idx}`,
             type: msg.role === 'user' ? 'user' : 'assistant',
             message: msg.content,
-            timestamp: new Date(msg.timestamp).toLocaleTimeString()
+            timestamp: toISOTimestamp(msg.timestamp)
           }));
 
           setMessages(historicalMessages);
@@ -315,12 +319,31 @@ export default function CompaneonChatInterface({
     }
   };
 
+  // Safely convert a timestamp (ms, seconds, Firestore Timestamp, or undefined) to ISO string
+  const toISOTimestamp = (ts: any): string => {
+    if (!ts) return new Date().toISOString();
+    if (ts._seconds) return new Date(ts._seconds * 1000).toISOString();
+    if (typeof ts === 'number') {
+      // If timestamp is less than 10 trillion, it's likely in milliseconds already
+      // (10 trillion ms = year 2286, 10 billion seconds = year 2286)
+      // Timestamps from Date.now() are ~1.7 trillion in 2026
+      const date = new Date(ts);
+      if (isNaN(date.getTime())) return new Date().toISOString();
+      return date.toISOString();
+    }
+    if (typeof ts === 'string') return ts;
+    return new Date().toISOString();
+  };
+
   // Format timestamp for display
   const formatSessionDate = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    // Compare actual calendar dates in user's timezone
+    const dateDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffDays = Math.round((today.getTime() - dateDay.getTime()) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
       return `Today at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -899,6 +922,7 @@ export default function CompaneonChatInterface({
 
     setIsStreamActive(true);
     setIsTyping(true);
+    lastHistoryFetchRef.current = 0;
     setTimeout(() => scrollToBottom(true), 10);
 
     if (!messageText) {
@@ -1820,7 +1844,7 @@ export default function CompaneonChatInterface({
               <button
                 onClick={() => {
                   setShowHistoryPanel(!showHistoryPanel);
-                  if (!showHistoryPanel) {
+                  if (!showHistoryPanel && lastHistoryFetchRef.current === 0) {
                     fetchChatSessions();
                   }
                 }}
