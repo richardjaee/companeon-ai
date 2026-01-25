@@ -173,8 +173,9 @@ export class Agent {
     let justProcessedTools = false; // Track if we just finished tool execution
     
     // Track recent tool calls to prevent redundant calls
-    const recentToolCalls = []; // Array of recent tool names
-    const MAX_SAME_TOOL_CONSECUTIVE = 2; // Allow max 2 of same tool in a row
+    // Uses "toolName:argsHash" to allow same tool with DIFFERENT args (e.g., quotes on different chains)
+    const recentToolCalls = []; // Array of "toolName:argsHash" strings
+    const MAX_IDENTICAL_CALLS = 2; // Allow max 2 of IDENTICAL calls (same tool + same args)
     
     // Track write operations (tx tools) - block IDENTICAL calls only (same tool + same args)
     // This allows multi-swaps (UNI→ETH, USDC→ETH) but blocks duplicate calls (UNI→ETH twice)
@@ -274,18 +275,21 @@ export class Agent {
 
           for (const toolCall of response.toolCalls) {
             const { name, args, id } = toolCall;
-            
-            // Check for redundant consecutive tool calls
-            const sameToolCount = recentToolCalls.slice(-3).filter(t => t === name).length;
-            if (sameToolCount >= MAX_SAME_TOOL_CONSECUTIVE) {
-              this.logger?.warn?.('skipping_redundant_tool', { tool: name, consecutiveCount: sameToolCount });
+
+            // Check for IDENTICAL redundant calls (same tool + same args)
+            // This allows same tool with different args (e.g., get_aggregated_quote for different chains)
+            const argsHash = JSON.stringify(args || {});
+            const callKey = `${name}:${argsHash}`;
+            const identicalCallCount = recentToolCalls.slice(-5).filter(t => t === callKey).length;
+            if (identicalCallCount >= MAX_IDENTICAL_CALLS) {
+              this.logger?.warn?.('skipping_identical_tool', { tool: name, args, identicalCount: identicalCallCount });
               // Skip this tool call and tell the LLM to proceed
               messages.push({
                 role: 'tool',
                 tool_call_id: id,
-                content: JSON.stringify({ 
-                  skipped: true, 
-                  reason: `Tool ${name} was already called recently. Use the previous result and proceed.` 
+                content: JSON.stringify({
+                  skipped: true,
+                  reason: `Tool ${name} was already called with these exact arguments. Use the previous result and proceed.`
                 })
               });
               continue;
@@ -350,7 +354,7 @@ export class Agent {
               this.logger?.info?.('write_op_registered', { tool: name, opKey });
             }
             
-            recentToolCalls.push(name);
+            recentToolCalls.push(callKey);
             
             emit({ type: 'tool_call', tool: name, input: args });
             this.logger?.info?.('tool_call', { tool: name, args });
