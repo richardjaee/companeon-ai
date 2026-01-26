@@ -1,5 +1,7 @@
 # Companeon
 
+**First Place Winner - MetaMask Advanced Permissions Hackathon** | [New Project Track](https://x.com/metamaskdev/status/2014352928941674728)
+
 A wallet-native AI agent that turns conversational prompts into on-chain transactions using ERC-7715 Advanced Permissions and Envio HyperSync.
 
 ---
@@ -51,6 +53,7 @@ companeon-ai/
 │   │   │   ├── ToolRegistry.js     # Tool management
 │   │   │   └── definitions/
 │   │   │       ├── wallet-*.js     # Wallet tools
+│   │   │       ├── aggregator.js   # 0x DEX aggregator
 │   │   │       ├── delegation.js   # Permission tools
 │   │   │       ├── envio.js        # Envio history tools
 │   │   │       ├── transfer-agent.js      # A2A: recurring transfers
@@ -64,6 +67,14 @@ companeon-ai/
 │   │       └── FirestoreSessionStore.js
 │   ├── package.json
 │   └── .env.example
+│
+├── services/
+│   ├── api/                     # API Gateway service
+│   │   └── src/index.js
+│   └── worker/                  # Background worker service
+│       └── src/index.js
+│
+├── Makefile                     # Build and deploy commands
 │
 └── frontend/
     ├── src/
@@ -221,8 +232,8 @@ User Prompt → Express API → Agent (ReAct Loop) → Tools → Blockchain
 
 **3. Tool Registry** ([`agent/src/tools/`](./agent/src/tools/))
 - Wallet Tools: Holdings, swaps, transfers
-- DeFi Tools: Uniswap integration, gas estimation
-- Research Tools: Perplexity search (x402), price data
+- DeFi Tools: 0x DEX aggregator, gas estimation, price data
+- Research Tools: Perplexity search (x402), web browsing
 - Security Tools: GoPlus recipient verification, Envio transaction history
 - Delegation Tools: Limit checking, permission diagnosis
 
@@ -389,16 +400,18 @@ Relevant files
 ### Wallet Management
 - `get_holdings` - Get ETH and token balances
 - `transfer_funds` - Send tokens to recipient
-- `execute_swap` - Swap tokens via Uniswap
-- `get_swap_quote` - Preview swap rates
 - `get_token_balance` - Query specific token balance
+
+### DEX Aggregator (0x)
+- `get_aggregated_quote` - Get best swap rate across DEXs (supports Ethereum, Base, Arbitrum, Optimism, Polygon)
+- `execute_aggregated_swap` - Execute swap via 0x aggregator
+- `lookup_token` - Find token address by symbol (uses Uniswap token lists)
 
 ### DeFi Utilities
 - `get_prices` - Get crypto prices (CoinMarketCap)
 - `get_market_sentiment` - Fear & Greed Index
 - `estimate_gas_cost` - Gas price estimation
 - `get_gas_price` - Current gas prices by tier (slow/standard/fast)
-- `check_pool_liquidity` - Uniswap pool liquidity check
 
 ### Research (Paid/x402)
 - `browse_web` - Perplexity web search (0.001 USDC)
@@ -493,13 +506,32 @@ NEXT_PUBLIC_SENTRY_DSN=
 
 ### Prerequisites
 - Node.js 18+
+- Docker (for local builds)
 - Google Cloud Project (for Firestore + Gemini)
+- gcloud CLI (for deployment)
 - MetaMask Flask or compatible ERC-7715 wallet
 
-### Backend Setup
+### Quick Start (Local Development)
 
 ```bash
-cd backend
+# Clone the repo
+git clone https://github.com/anthropics/companeon-ai.git
+cd companeon-ai
+
+# Start all services with Docker
+make dev
+
+# Or start individual services:
+make agent    # Backend agent on :8080
+make api      # API gateway
+make worker   # Background worker
+```
+
+### Manual Setup
+
+**Backend (Agent)**
+```bash
+cd agent
 npm install
 cp .env.example .env
 # Edit .env with your keys
@@ -508,8 +540,7 @@ npm run dev
 # Server starts on http://localhost:8080
 ```
 
-### Frontend Setup
-
+**Frontend**
 ```bash
 cd frontend
 npm install
@@ -520,17 +551,28 @@ npm run dev
 # Open http://localhost:3000
 ```
 
+**Additional Services**
+```bash
+# API Gateway
+cd services/api && npm install && npm run dev
+
+# Background Worker
+cd services/worker && npm install && npm run dev
+```
+
 ---
 
 ##
 
 ## Tech Stack
 
-**Frontend:** Next.js 14, TypeScript, Tailwind CSS, MetaMask Smart Accounts Kit
+**Frontend:** Next.js 15, TypeScript, Tailwind CSS, MetaMask Smart Accounts Kit, Coinbase Wallet SDK, WalletConnect
 
-**Backend:** Node.js, Express, Google Gemini 2.5 Flash, ethers.js, viem
+**Backend:** Node.js, Express, Google Gemini 2.5 Flash, ethers.js, viem, Zod
 
-**Infrastructure:** Envio HyperSync, Cloud Firestore, Uniswap V4
+**DeFi:** 0x DEX Aggregator, Uniswap Token Lists, CoinMarketCap API
+
+**Infrastructure:** Google Cloud Run, Envio HyperSync, Cloud Firestore
 
 ---
 
@@ -562,28 +604,72 @@ autoTxMode: 'auto'  // Executes immediately
 
 ## Deployment
 
-### Google Cloud Run (Backend)
+All services deploy to **Google Cloud Run**. Use the Makefile for quick deployments.
+
+### Quick Deploy (Recommended)
 
 ```bash
-cd backend
-docker build -t companeon-backend .
-docker tag companeon-backend gcr.io/PROJECT_ID/companeon-backend
-docker push gcr.io/PROJECT_ID/companeon-backend
+# Deploy individual services to dev
+make deploy-agent-dev    # Deploy agent
+make deploy-api-dev      # Deploy API gateway
+make deploy-worker-dev   # Deploy background worker
 
-gcloud run deploy companeon-backend \
-  --image gcr.io/PROJECT_ID/companeon-backend \
-  --platform managed \
+# Deploy all services to dev
+make deploy-dev
+
+# Deploy to production
+make deploy-agent        # Agent to prod
+make deploy-api          # API to prod
+make deploy-worker       # Worker to prod
+make deploy-prod         # All services to prod
+```
+
+### First-Time Setup
+
+1. **Configure gcloud CLI**
+```bash
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
+```
+
+2. **Set environment variables** (one-time, persists across deploys)
+```bash
+gcloud run services update companeon-agent-dev \
   --region us-central1 \
   --set-env-vars="GOOGLE_GENAI_API_KEY=..." \
   --set-env-vars="BACKEND_DELEGATION_KEY=..." \
-  --set-env-vars="RPC_URL=https://mainnet.base.org"
+  --set-env-vars="RPC_URL=https://mainnet.base.org" \
+  --set-env-vars="GOOGLE_CLOUD_PROJECT=your-project"
 ```
 
-### Vercel (Frontend)
+3. **Deploy**
+```bash
+make deploy-agent-dev
+```
+
+### Manual Docker Deploy
 
 ```bash
-cd frontend
-vercel
+# Build and push
+cd agent
+docker build -t us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/agent:dev .
+docker push us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/agent:dev
+
+# Deploy to Cloud Run
+gcloud run deploy companeon-agent-dev \
+  --image us-central1-docker.pkg.dev/PROJECT_ID/cloud-run-source-deploy/agent:dev \
+  --region us-central1 \
+  --allow-unauthenticated
+```
+
+### View Deployment Status
+
+```bash
+# List all services
+make urls
+
+# Check specific service
+gcloud run revisions list --service=companeon-agent-dev --region=us-central1
 ```
 
 ---
@@ -596,4 +682,4 @@ Free for personal, educational, and non-commercial use. Commercial use requires 
 
 ---
 
-Built for MetaMask Advanced Permissions Hackathon 2025
+**First Place Winner** - MetaMask Advanced Permissions Hackathon 2025 (New Project Track)
