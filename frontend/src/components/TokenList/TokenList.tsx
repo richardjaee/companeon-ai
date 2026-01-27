@@ -218,14 +218,10 @@ export default function TokenList({
         {sortedTokens.map((token, index) => (
           <div key={token.symbol || index} className="relative p-[2px]">
             <div
-              className={`bg-gray-50 rounded-[16px] shadow-sm pt-4 px-4 pb-3 transition-all duration-300 ease-in-out ${
+              className={`relative bg-gray-50 rounded-[16px] shadow-sm pt-4 px-4 pb-3 ${
                 disabledSelection
                   ? 'cursor-not-allowed opacity-60 bg-gray-200'
                   : 'cursor-pointer hover:bg-gray-100'
-              } ${
-                isSelectionMode && token.isSelected ? 'outline outline-2 outline-[#AD29FF] outline-offset-0' : ''
-              } ${
-                !isSelectionMode && hoveredToken === token.contract && !disabledSelection ? 'outline outline-2 outline-[#AD29FF] outline-offset-0' : ''
               } ${
                 isSelectionMode && isSelectionLimitReached && !token.isSelected ? 'cursor-not-allowed opacity-75' : ''
               }`}
@@ -233,13 +229,21 @@ export default function TokenList({
               onMouseEnter={() => handleMouseEnter(token.contract)}
               onMouseLeave={handleMouseLeave}
             >
+              {/* Animated border overlay */}
+              <div
+                className={`absolute inset-0 rounded-[16px] border-2 border-[#AD29FF] pointer-events-none transition-opacity duration-150 ease-out ${
+                  (isSelectionMode && token.isSelected) || (!isSelectionMode && hoveredToken === token.contract && !disabledSelection)
+                    ? 'opacity-100'
+                    : 'opacity-0'
+                }`}
+              />
               <div className="flex">
                 {/* Main content area */}
                 <div className="flex-1 flex flex-col">
                   {/* Top row with logo, ticker/name, and selection indicator */}
                   <div className="flex items-start justify-between">
                     {/* Left: Logo and token name/ticker */}
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       {/* Token logo */}
                       <div className="flex-shrink-0">
                         <div className="w-8 h-8 rounded-full overflow-hidden">
