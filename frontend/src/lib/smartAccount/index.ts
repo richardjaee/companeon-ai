@@ -214,8 +214,6 @@ export async function createSmartAccountWithPermissions(
       throw new Error('No valid spending limit permissions found');
     }
 
-    
-    
     // Step 4: Request execution permissions using SDK method
     // This is the proper ERC-7715 flow - MetaMask will create a smart account if needed
     

@@ -15,22 +15,16 @@ import { useChain } from '@/hooks/useChain';
 
 import GetStartedSection from '../GetStartedSection';
 import AgentPermissionsView from './AgentPermissionsView';
+import PermissionList from '@/components/PermissionList/PermissionList';
 import { AgentAsset } from '@/lib/smartAccount/types';
 import DisconnectConfirmModal from '@/components/Auth/DisconnectConfirmModal';
 import AuthModal from '@/components/Auth/AuthModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { walletApi } from '@/lib/api/wallet';
 
-type TabOption = 'all' | 'coins' | 'nfts';
-
 const CryptoBalance = dynamic(() => import('@/app/[chain]/portfolio/components/cryptoBalance'), {
-  loading: () => <div className="text-center py-4">Loading balances...</div>, 
-  ssr: false 
-});
-
-const NFTBalance = dynamic(() => import('@/app/[chain]/portfolio/components/nftBalance'), {
-  loading: () => <div className="text-center py-4">Loading NFTs...</div>, 
-  ssr: false 
+  loading: () => <div className="text-center py-4">Loading balances...</div>,
+  ssr: false
 });
 
 export default function PortfolioView() {
@@ -38,7 +32,6 @@ export default function PortfolioView() {
   const [companeonContractAddress, setCompaneonContractAddress] = useState<string | null>(null);
   const [isCoinSectionOpen, setIsCoinSectionOpen] = useState(true);
   const [isNFTSectionOpen, setIsNFTSectionOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<TabOption>('coins');
   
   const [isTokenSelectionMode, setIsTokenSelectionMode] = useState(false);
   const [selectedTokens, setSelectedTokens] = useState<Set<string>>(new Set());
@@ -62,17 +55,17 @@ export default function PortfolioView() {
   const [portfolioTokenPrices, setPortfolioTokenPrices] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showAssistantChat, setShowAssistantChat] = useState(true);
+  const [isChatExpanded, setIsChatExpanded] = useState(false);
+  const [isChatCollapsing, setIsChatCollapsing] = useState(false);
   const [showAgentPermissions, setShowAgentPermissions] = useState(false);
   const [isAgentPermissionsClosing, setIsAgentPermissionsClosing] = useState(false);
   const [agentSelectedAssets, setAgentSelectedAssets] = useState<AgentAsset[]>([]);
   const [walletLimits, setWalletLimits] = useState<any[]>([]);
   const [isLoadingLimits, setIsLoadingLimits] = useState(false);
-  const [flashingLimits, setFlashingLimits] = useState<Record<string, 'decrease' | 'increase'>>({});
 
   const handleCloseAgentPermissions = () => {
     setIsAgentPermissionsClosing(true);
   };
-  const previousLimitsRef = useRef<Record<string, string>>({});
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -356,39 +349,6 @@ export default function PortfolioView() {
   useEffect(() => {
     fetchWalletLimits();
   }, [fetchWalletLimits]);
-
-  // Detect wallet limit changes and trigger flash effects
-  useEffect(() => {
-    walletLimits.forEach(limit => {
-      const limitKey = limit.asset;
-      const currentRemaining = limit.remainingLimit;
-      const previousRemaining = previousLimitsRef.current[limitKey];
-
-      if (previousRemaining && previousRemaining !== currentRemaining) {
-        // Extract numeric values for comparison
-        const currentValue = parseFloat(currentRemaining.split(' ')[0]);
-        const previousValue = parseFloat(previousRemaining.split(' ')[0]);
-
-        if (!isNaN(currentValue) && !isNaN(previousValue) && currentValue !== previousValue) {
-          const changeType = currentValue > previousValue ? 'increase' : 'decrease';
-
-          setFlashingLimits(prev => ({
-            ...prev,
-            [limitKey]: changeType
-          }));
-
-          setTimeout(() => {
-            setFlashingLimits(prev => {
-              const newState = { ...prev };
-              delete newState[limitKey];
-              return newState;
-            });
-          }, 1000);
-        }
-      }
-      previousLimitsRef.current[limitKey] = currentRemaining;
-    });
-  }, [walletLimits]);
 
   const handleTokenSelect = (token: { symbol: string; contract?: string; balance: string }) => {
     setSelectedTokens(prev => {
@@ -925,18 +885,10 @@ export default function PortfolioView() {
                   </div>
 
                   {/* Tokens */}
-                  <div className="flex flex-col px-6">
+                  <div className="flex flex-col px-6 last:pr-0">
                     <span className="text-xs text-gray-600 uppercase tracking-wide mb-1">Tokens</span>
                     <span className="text-base font-medium text-gray-900">
                       {portfolioSummary.assets.length}
-                    </span>
-                  </div>
-
-                  {/* NFTs */}
-                  <div className="flex flex-col px-6 last:pr-0">
-                    <span className="text-xs text-gray-600 uppercase tracking-wide mb-1">NFTs</span>
-                    <span className="text-base font-medium text-gray-900">
-                      {(nftContractData?.nfts?.length || 0)}
                     </span>
                   </div>
                 </div>
@@ -948,9 +900,11 @@ export default function PortfolioView() {
 
 
       {/* Main content area with two columns */}
-      <div className="flex-1 flex lg:flex-row flex-col overflow-hidden">
+      <div className="flex-1 flex lg:flex-row flex-col overflow-hidden relative">
         {/* Left Column - Main Content - Now scrollable */}
-        <div className={`lg:order-1 order-2 flex-1 flex flex-col min-h-0 overflow-y-auto relative ${isTokenSelectionMode ? 'pb-24' : 'pb-6'}`} style={{ isolation: 'isolate' }}>
+        <div
+          className={`lg:order-1 order-2 flex flex-col min-h-0 overflow-y-auto relative flex-1 lg:mr-[500px] lg:z-0 ${isTokenSelectionMode ? 'pb-24' : 'pb-6'}`}
+        >
               {/* Get Started Section - always show (banners are dismissible) */}
               <div className="lg:px-6 px-4">
                 <GetStartedSection
@@ -963,200 +917,41 @@ export default function PortfolioView() {
                 />
               </div>
 
-              {/* Your Companeons Section */}
-              {isConnected && (
-                <div className="pt-6 pb-6 lg:px-6 px-4">
-                  <h2 className="text-lg font-medium text-gray-900 mb-4 mt-0">Your permissions</h2>
-                  <div className="space-y-3">
-                    {walletLimits.length > 0 ? (
-                      walletLimits.map((tokenLimit: any) => (
-                      <div key={tokenLimit.asset} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
-                        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
-                          {/* Left: Logo + Custom Label */}
-                          <div className="flex items-center gap-3 min-w-[100px]">
-                            <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-white flex-shrink-0">
-                              <Image
-                                src={`/logos/${tokenLimit.asset.toLowerCase()}-logo.png`}
-                                alt={tokenLimit.asset}
-                                width={32}
-                                height={32}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = '/logos/eth-logo.png';
-                                }}
-                              />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-base font-semibold text-gray-900">{tokenLimit.asset}</span>
-                              <span className="text-xs text-gray-500">Custom label</span>
-                            </div>
-                          </div>
+              {/* Your Permissions Section */}
+              <PermissionList
+                walletLimits={walletLimits}
+                fetchWalletLimits={fetchWalletLimits}
+                isConnected={isConnected}
+              />
 
-                          {/* Right: Limits in horizontal layout */}
-                          <div className="flex flex-wrap items-center gap-4 lg:gap-6 flex-1">
-                            {/* Spend Limit */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Spend limit</span>
-                              <span className="text-sm font-medium text-gray-900">{tokenLimit.configuredLimit}</span>
-                            </div>
-
-                            {/* Remaining */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Remaining</span>
-                              <span className={`text-sm font-medium transition-colors duration-1000 ${
-                                flashingLimits[tokenLimit.asset] === 'decrease'
-                                  ? 'text-red-600'
-                                  : flashingLimits[tokenLimit.asset] === 'increase'
-                                  ? 'text-green-600'
-                                  : 'text-gray-900'
-                              }`}>{tokenLimit.remainingLimit}</span>
-                            </div>
-
-                            {/* Frequency */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Frequency</span>
-                              <span className="text-sm font-medium text-gray-900 capitalize">{tokenLimit.frequency}</span>
-                            </div>
-
-                            {/* Duration */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Duration</span>
-                              <span className="text-sm font-medium text-gray-900 whitespace-nowrap">{tokenLimit.startDate} - {tokenLimit.endDate}</span>
-                            </div>
-                          </div>
-
-                          {/* Edit Icon */}
-                          <button className="flex-shrink-0 p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                            <svg
-                              className="w-5 h-5"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"
-                              />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                    ) : (
-                      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
-                        <div className="flex flex-wrap items-center gap-4 lg:gap-6">
-                          {/* Limits with "Not set" values */}
-                          <div className="flex flex-wrap items-center gap-4 lg:gap-6 flex-1">
-                            {/* Spend Limit */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Spend limit</span>
-                              <span className="text-sm font-medium text-gray-500">Not set</span>
-                            </div>
-
-                            {/* Remaining */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Remaining</span>
-                              <span className="text-sm font-medium text-gray-500">Not set</span>
-                            </div>
-
-                            {/* Frequency */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Frequency</span>
-                              <span className="text-sm font-medium text-gray-500">Not set</span>
-                            </div>
-
-                            {/* Duration */}
-                            <div className="flex flex-col">
-                              <span className="text-xs text-gray-600">Duration</span>
-                              <span className="text-sm font-medium text-gray-500">Not set</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Tab Navigation - Sticky at 16px from top */}
-              {(
-                <div className="sticky top-0 bg-white z-50 pb-4 pt-3 lg:px-6 px-4">
-                  <div>
-                    <div className="flex items-center space-x-8">
-                      <h3 className="text-lg font-medium flex items-center">
-                        <button
-                          onClick={() => setActiveTab('coins')}
-                          className={`transition-all ${
-                            activeTab === 'coins'
-                              ? 'text-gray-900 border-b-2 border-gray-900'
-                              : 'text-gray-400 hover:text-gray-600'
-                          }`}
-                        >
-                          Crypto
-                        </button>
-                        <button
-                          onClick={() => setActiveTab('nfts')}
-                          className={`ml-8 transition-all ${
-                            activeTab === 'nfts'
-                              ? 'text-gray-900 border-b-2 border-gray-900'
-                              : 'text-gray-400 hover:text-gray-600'
-                          }`}
-                        >
-                          NFTs
-                        </button>
-                      </h3>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* Your Crypto Header */}
+              <div className="pt-6 lg:px-6 px-4">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">Your Crypto</h2>
+              </div>
 
               {/* Content Area */}
               <div className={`flex-1 lg:px-6 px-4 relative z-0`}>
-                {
-                  <>
-                    {/* Content based on active tab */}
-                    {activeTab === 'coins' && (
-                        <div>
-                          <CryptoBalance
-                            tokenData={isConnected ? tokenData || null : null}
-                            isTokenLoading={isTokenLoading && isConnected}
-                            isSelectionMode={isTokenSelectionMode}
-                            onTokenSelect={handleTokenSelect}
-                            selectedTokens={selectedTokens}
-                            isSelectionLimitReached={isSelectionLimitReached}
-                            onStartSelection={handleStartTokenSelection}
-                            disabledSelection={false}
-                          />
-                        </div>
-                      )}
-
-                      {activeTab === 'nfts' && (
-                        <div>
-                          <NFTBalance
-                            nftContractData={isConnected ? nftContractData || { nfts: [] } : { nfts: [] }}
-                            nftData={isConnected ? companeonNFTData || { nfts: [] } : { nfts: [] }}
-                            isNFTLoading={isNFTLoading && isConnected}
-                            isSelectionMode={isTokenSelectionMode}
-                            onNFTSelect={handleNFTSelect}
-                            selectedNFTs={selectedNFTs}
-                            isNFTSelected={isNFTSelected}
-                            filterContractAddress={companeonContractAddress}
-                            isSelectionLimitReached={isSelectionLimitReached}
-                            onStartSelection={handleStartNFTSelection}
-                            disabledSelection={false}
-                          />
-                        </div>
-                      )}
-                  </>
-                }
+                <CryptoBalance
+                  tokenData={isConnected ? tokenData || null : null}
+                  isTokenLoading={isTokenLoading && isConnected}
+                  isSelectionMode={isTokenSelectionMode}
+                  onTokenSelect={handleTokenSelect}
+                  selectedTokens={selectedTokens}
+                  isSelectionLimitReached={isSelectionLimitReached}
+                  onStartSelection={handleStartTokenSelection}
+                  disabledSelection={false}
+                />
               </div>
         </div>
 
-        {/* Right Column - Chat */}
-        <div className="lg:order-2 order-1 lg:w-[500px] w-full lg:flex-shrink-0 lg:border-l lg:border-t-0 border-t border-gray-200 lg:overflow-y-auto">
+        {/* Right Column - Chat (absolutely positioned on right, expands leftward) */}
+        <div
+          className={`lg:order-2 order-1 border-t border-gray-200 overflow-y-auto lg:border-t-0 bg-white lg:absolute lg:inset-y-0 lg:right-0 lg:border-l transition-[width] duration-300 ease-in-out ${
+            isChatExpanded
+              ? 'lg:w-full lg:z-40 lg:border-l-0'
+              : 'lg:w-[500px] w-full lg:z-20'
+          }`}
+        >
           <CompaneonChatInterface
             contextData={{
               totalValue: totalPortfolioValue.toFixed(2),
@@ -1165,6 +960,8 @@ export default function PortfolioView() {
             }}
             onBack={() => {}}
             autoConnect={false}
+            isExpanded={isChatExpanded}
+            onToggleExpand={() => setIsChatExpanded(!isChatExpanded)}
           />
         </div>
       </div>
@@ -1254,6 +1051,7 @@ export default function PortfolioView() {
           </div>
         </div>
       )}
+
     </div>
   );
 } 
