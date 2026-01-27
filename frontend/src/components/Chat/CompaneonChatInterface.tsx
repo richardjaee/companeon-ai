@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PaperAirplaneIcon, XMarkIcon, Cog6ToothIcon, ClockIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, XMarkIcon, Cog6ToothIcon, ClockIcon, PlusIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
@@ -110,14 +110,18 @@ interface CompaneonChatInterfaceProps {
   persistedMessages?: ChatMessage[];
   onStateChange?: (messages: ChatMessage[], isConnected: boolean) => void;
   autoConnect?: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
-export default function CompaneonChatInterface({ 
-  contextData, 
+export default function CompaneonChatInterface({
+  contextData,
   onBack,
   persistedMessages = [],
   onStateChange,
-  autoConnect = false
+  autoConnect = false,
+  isExpanded = false,
+  onToggleExpand
 }: CompaneonChatInterfaceProps) {
   const { ethereum, address, isConnected: walletConnected, signMessage } = useWallet();
   const { config } = useChain();
@@ -1876,6 +1880,21 @@ export default function CompaneonChatInterface({
               >
                 <PlusIcon className="h-5 w-5" />
               </button>
+
+              {/* Expand/Collapse button */}
+              {onToggleExpand && (
+                <button
+                  onClick={onToggleExpand}
+                  className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                  title={isExpanded ? "Collapse chat" : "Expand chat"}
+                >
+                  {isExpanded ? (
+                    <ArrowsPointingInIcon className="h-5 w-5" />
+                  ) : (
+                    <ArrowsPointingOutIcon className="h-5 w-5" />
+                  )}
+                </button>
+              )}
             </>
           )}
         </div>

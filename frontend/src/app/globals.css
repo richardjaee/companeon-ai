@@ -203,6 +203,34 @@
   animation: slideDown 0.3s ease-out forwards;
 }
 
+/* Slide in from right animation for expanded chat */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-from-right {
+  animation: slideInFromRight 0.3s ease-out forwards;
+}
+
+/* Slide out to right animation for collapsing chat */
+@keyframes slideOutToRight {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.animate-slide-out-to-right {
+  animation: slideOutToRight 0.3s ease-out forwards;
+}
+
 /* Always hide the browser's default date placeholder (mm/dd/yyyy) */
 .date-input-custom::-webkit-datetime-edit-text,
 .date-input-custom::-webkit-datetime-edit-month-field,
