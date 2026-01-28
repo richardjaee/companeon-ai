@@ -31,6 +31,205 @@ const db = new Firestore({
   projectId: process.env.GOOGLE_CLOUD_PROJECT
 });
 
+// ========================================
+// SDK Helpers for On-Chain Limit Queries
+// ========================================
+
+// Lazy-loaded SDK modules
+let sdkModule = null;
+let sdkUtilsModule = null;
+let viemModule = null;
+const clientCache = new Map();
+
+async function getViem() {
+  if (!viemModule) {
+    viemModule = await import('viem');
+  }
+  return viemModule;
+}
+
+async function getViemChains() {
+  return await import('viem/chains');
+}
+
+async function getSDK() {
+  if (!sdkModule) {
+    sdkModule = await import('@metamask/smart-accounts-kit');
+  }
+  return sdkModule;
+}
+
+async function getSDKUtils() {
+  if (!sdkUtilsModule) {
+    sdkUtilsModule = await import('@metamask/smart-accounts-kit/utils');
+  }
+  return sdkUtilsModule;
+}
+
+async function getViemChainObject(chainId) {
+  const chains = await getViemChains();
+  switch (chainId) {
+    case 11155111:
+      return chains.sepolia;
+    case 8453:
+      return chains.base;
+    default:
+      return chains.sepolia;
+  }
+}
+
+function getRpcUrl(chainId) {
+  if (chainId === 8453) {
+    return process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+  }
+  return process.env.RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+}
+
+async function getCaveatEnforcerClient(chainId) {
+  const cacheKey = `client_${chainId}`;
+
+  if (clientCache.has(cacheKey)) {
+    return clientCache.get(cacheKey);
+  }
+
+  const chain = await getViemChainObject(chainId);
+  const rpcUrl = getRpcUrl(chainId);
+
+  const { createPublicClient, http } = await getViem();
+  const { createCaveatEnforcerClient, getSmartAccountsEnvironment } = await getSDK();
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(rpcUrl)
+  });
+
+  const environment = getSmartAccountsEnvironment(chain.id);
+
+  const caveatEnforcerClient = createCaveatEnforcerClient({
+    environment,
+    client: publicClient
+  });
+
+  clientCache.set(cacheKey, { caveatEnforcerClient, environment, publicClient });
+
+  return { caveatEnforcerClient, environment, publicClient };
+}
+
+/**
+ * Query on-chain limits using MetaMask Smart Accounts SDK
+ */
+async function queryOnChainLimits(delegation, chainId) {
+  const results = {
+    nativeToken: null,
+    erc20: {}
+  };
+
+  try {
+    const { caveatEnforcerClient, environment } = await getCaveatEnforcerClient(chainId);
+    const { decodeDelegations } = await getSDKUtils();
+
+    const nativePeriodEnforcer = environment.caveatEnforcers?.NativeTokenPeriodTransferEnforcer?.toLowerCase();
+    const erc20PeriodEnforcer = environment.caveatEnforcers?.ERC20PeriodTransferEnforcer?.toLowerCase();
+
+    // Query native token using native context
+    const nativeContext = delegation.allPermissionContexts?.native || delegation.permissionsContext;
+    if (nativeContext && nativeContext !== '0x') {
+      try {
+        const nativeDelegations = decodeDelegations(nativeContext);
+        if (nativeDelegations.length > 0) {
+          const nativeDelegation = nativeDelegations[0];
+          const caveats = nativeDelegation.caveats || [];
+
+          for (const caveat of caveats) {
+            const enforcerAddr = caveat.enforcer?.toLowerCase();
+            if (enforcerAddr === nativePeriodEnforcer) {
+              try {
+                const result = await caveatEnforcerClient.getNativeTokenPeriodTransferEnforcerAvailableAmount({
+                  delegation: nativeDelegation
+                });
+
+                results.nativeToken = {
+                  availableWei: result.availableAmount.toString(),
+                  availableEth: ethers.formatEther(result.availableAmount),
+                  isNewPeriod: result.isNewPeriod,
+                  currentPeriod: result.currentPeriod?.toString(),
+                  querySuccess: true
+                };
+              } catch (e) {
+                console.error('Native period query failed:', e.message);
+                results.nativeToken = { querySuccess: false, error: e.message };
+              }
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Native context decode failed:', e.message);
+      }
+    }
+
+    // Query ERC-20 tokens using their specific contexts
+    const allContexts = delegation.allPermissionContexts || {};
+    for (const [tokenKey, tokenContext] of Object.entries(allContexts)) {
+      if (tokenKey === 'native' || !tokenContext || tokenContext === '0x') continue;
+
+      const tokenAddress = tokenKey.toLowerCase();
+
+      try {
+        const tokenDelegations = decodeDelegations(tokenContext);
+        if (tokenDelegations.length > 0) {
+          const tokenDelegation = tokenDelegations[0];
+          const caveats = tokenDelegation.caveats || [];
+
+          for (const caveat of caveats) {
+            const enforcerAddr = caveat.enforcer?.toLowerCase();
+
+            if (enforcerAddr === erc20PeriodEnforcer) {
+              try {
+                const result = await caveatEnforcerClient.getErc20PeriodTransferEnforcerAvailableAmount({
+                  delegation: tokenDelegation
+                });
+
+                const scope = (delegation.scopes || []).find(s =>
+                  s.tokenAddress?.toLowerCase() === tokenAddress
+                );
+                const decimals = scope?.decimals || 6;
+                const availableRaw = result.availableAmount.toString();
+                const availableFormatted = (Number(availableRaw) / Math.pow(10, decimals)).toString();
+
+                results.erc20[tokenAddress] = {
+                  tokenAddress,
+                  tokenSymbol: scope?.tokenSymbol,
+                  decimals,
+                  availableUnits: availableRaw,
+                  availableFormatted,
+                  isNewPeriod: result.isNewPeriod,
+                  currentPeriod: result.currentPeriod?.toString(),
+                  querySuccess: true
+                };
+              } catch (e) {
+                console.error('ERC20 period query failed:', tokenAddress, e.message);
+                results.erc20[tokenAddress] = {
+                  tokenAddress,
+                  querySuccess: false,
+                  error: e.message
+                };
+              }
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        console.error('ERC20 context decode failed:', tokenAddress, e.message);
+      }
+    }
+  } catch (e) {
+    console.error('queryOnChainLimits error:', e.message);
+  }
+
+  return results;
+}
+
 // Middleware
 app.use(cors({
   origin: '*',
@@ -311,10 +510,12 @@ app.get('/wallet/status', async (req, res) => {
 /**
  * GET /wallet/limits - Get wallet spending limits
  * Returns current spending limits and remaining allowances
+ * Now queries on-chain enforcer state for actual remaining amounts
  */
 app.get('/wallet/limits', async (req, res) => {
   try {
     const walletAddress = req.query.wallet || req.query.walletAddress;
+    const chainId = parseInt(req.query.chainId) || 11155111;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'wallet query param required' });
@@ -341,6 +542,17 @@ app.get('/wallet/limits', async (req, res) => {
     const scopes = delegation.scopes || data.scopes || [];
     const delegationEnabled = delegation.enabled || data.delegationActive || false;
 
+    // Query on-chain limits using SDK if delegation is enabled
+    let onChainLimits = { nativeToken: null, erc20: {} };
+    if (delegationEnabled && (delegation.permissionsContext || delegation.allPermissionContexts)) {
+      try {
+        onChainLimits = await queryOnChainLimits(delegation, chainId);
+        console.log('On-chain limits queried:', JSON.stringify(onChainLimits, null, 2));
+      } catch (e) {
+        console.error('On-chain limit query failed, using stored values:', e.message);
+      }
+    }
+
     // Transform scopes to limits format expected by frontend
     const limits = scopes.map(scope => {
       // Determine asset symbol - avoid duplicate like "ETH ETH"
@@ -362,6 +574,27 @@ app.get('/wallet/limits', async (req, res) => {
         }
       }
       if (!configuredLimit) configuredLimit = '0';
+
+      // Get on-chain available amount based on token type
+      let available = configuredLimit; // Fallback to configured if on-chain query failed
+      let currentPeriod = '1';
+      let isNewPeriod = false;
+
+      if (scope.type === 'nativeTokenPeriodTransfer' && onChainLimits.nativeToken?.querySuccess) {
+        // Native token (ETH) - use on-chain available amount
+        available = `${onChainLimits.nativeToken.availableEth} ${asset}`;
+        currentPeriod = onChainLimits.nativeToken.currentPeriod || '1';
+        isNewPeriod = onChainLimits.nativeToken.isNewPeriod || false;
+      } else if (scope.type === 'erc20PeriodTransfer' && scope.tokenAddress) {
+        // ERC-20 token - look up by token address
+        const tokenAddr = scope.tokenAddress.toLowerCase();
+        const erc20Limit = onChainLimits.erc20[tokenAddr];
+        if (erc20Limit?.querySuccess) {
+          available = `${erc20Limit.availableFormatted} ${asset}`;
+          currentPeriod = erc20Limit.currentPeriod || '1';
+          isNewPeriod = erc20Limit.isNewPeriod || false;
+        }
+      }
 
       // Use stored periodDescription (human-readable) or fallback to computing it
       let frequency = scope.periodDescription || 'daily';
@@ -400,10 +633,11 @@ app.get('/wallet/limits', async (req, res) => {
         asset,
         tokenAddress: scope.tokenAddress || '0x0000000000000000000000000000000000000000',
         configuredLimit,
-        available: scope.remaining || configuredLimit,
+        available,
         frequency, // Human-readable: "per day", "per week", etc.
         periodDuration: scope.periodDuration || null, // Raw seconds for calculations
-        currentPeriod: '1',
+        currentPeriod,
+        isNewPeriod,
         status: 'HAS_ALLOWANCE',
         expiresAt: scopeExpiresAt,
         expiresAtFormatted: formatDate(scopeExpiresAt),
@@ -428,6 +662,10 @@ app.get('/wallet/limits', async (req, res) => {
       }
     }
 
+    // Determine source based on whether on-chain query succeeded
+    const hasOnChainData = onChainLimits.nativeToken?.querySuccess ||
+      Object.values(onChainLimits.erc20).some(e => e?.querySuccess);
+
     res.json({
       success: true,
       walletAddress: wallet,
@@ -437,7 +675,7 @@ app.get('/wallet/limits', async (req, res) => {
       expiresAt: masterExpiresAt,
       expiresIn,
       grantedAt: delegation.grantedAt || data.registeredAt,
-      source: 'firestore'
+      source: hasOnChainData ? 'on-chain' : 'firestore'
     });
   } catch (error) {
     console.error('wallet/limits error:', error);
