@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { ethers } from 'ethers';
 import { Firestore } from '@google-cloud/firestore';
 import { getChainConfig, getRpcUrl } from '../../lib/chainConfig.js';
+import { getSubDelegationsForWallet } from '../../lib/subDelegation.js';
 
 // Lazy-load heavy SDK dependencies to avoid startup issues
 let viemModule = null;
@@ -792,39 +793,109 @@ If limits are exceeded, the transaction will fail with enforcer errors.`,
       if (hasMultipleExpirations) {
         showToUser += `Note: Each token has a different expiration date.`;
       }
-      
+
+      // Query active sub-delegations (agent-to-agent scoped permissions)
+      let subDelegations = [];
+      try {
+        const allSubDelegations = await getSubDelegationsForWallet(effectiveAddress);
+
+        if (allSubDelegations.length > 0) {
+          const db = getFirestore();
+
+          for (const subDel of allSubDelegations) {
+            if (!subDel.scheduleId) continue;
+
+            const scheduleDoc = await db
+              .collection('RecurringTransferSchedules')
+              .doc(subDel.scheduleId)
+              .get();
+
+            if (!scheduleDoc.exists) continue;
+            const schedule = scheduleDoc.data();
+
+            // Only include active or paused schedules
+            if (schedule.status !== 'active' && schedule.status !== 'paused') continue;
+
+            const caveat = subDel.caveatConfig || {};
+            subDelegations.push({
+              scheduleId: subDel.scheduleId,
+              agentType: subDel.agentType || schedule.type || 'transfer',
+              status: schedule.status,
+              token: caveat.token || schedule.token,
+              amount: caveat.amount || schedule.amount,
+              frequency: caveat.frequency || schedule.frequency,
+              recipient: caveat.recipient || schedule.recipient,
+              nextRunAt: schedule.nextRunAt?.toDate?.()?.toISOString?.() || null,
+              executionCount: schedule.executionCount || 0,
+              name: schedule.name || null,
+              hasScopedCaveats: (subDel.caveatConfig && Object.keys(subDel.caveatConfig).length > 0) || false
+            });
+          }
+        }
+      } catch (e) {
+        logger?.warn?.('sub_delegation_query_failed', { error: e.message });
+      }
+
+      // Append sub-delegation info to display
+      if (subDelegations.length > 0) {
+        showToUser += `\n---\n\n**Active Sub-Delegations**\n\n`;
+        for (const sub of subDelegations) {
+          const agentLabel = sub.agentType === 'transfer' ? 'Transfer Agent'
+            : sub.agentType === 'dca' ? 'DCA Agent'
+            : sub.agentType;
+          const freqLabel = sub.frequency === 'daily' ? '/day'
+            : sub.frequency === 'weekly' ? '/week'
+            : sub.frequency === 'hourly' ? '/hour'
+            : sub.frequency === 'test' ? ' (test)'
+            : `/${sub.frequency}`;
+
+          showToUser += `**${agentLabel}${sub.name ? ` (${sub.name})` : ''}:** `;
+          showToUser += `${sub.amount} ${sub.token}${freqLabel}`;
+          if (sub.recipient) showToUser += ` to \`${sub.recipient}\``;
+          showToUser += ` [${sub.status}]`;
+          if (sub.hasScopedCaveats) showToUser += ` (scoped)`;
+          if (sub.nextRunAt) showToUser += `\n  Next: ${new Date(sub.nextRunAt).toLocaleString()}`;
+          if (sub.executionCount > 0) showToUser += ` | Executions: ${sub.executionCount}`;
+          showToUser += `\n\n`;
+        }
+      }
+
       return {
         walletAddress: effectiveAddress.toLowerCase(),
         delegationEnabled: true,
         chain: config.name,
         status: 'ACTIVE',
-        
+
         // Limits from SDK (each with its own expiresAt/expiresIn)
         limits,
-        
+
+        // Active sub-delegations (agent-to-agent with scoped caveats)
+        subDelegations: subDelegations.length > 0 ? subDelegations : undefined,
+        hasSubDelegations: subDelegations.length > 0,
+
         // Master timing (latest expiration across all tokens)
-        expiresAt: delegation.expiresAt 
-          ? new Date(delegation.expiresAt * 1000).toISOString() 
+        expiresAt: delegation.expiresAt
+          ? new Date(delegation.expiresAt * 1000).toISOString()
           : 'Never',
         expiresIn: delegation.expiresAt
           ? formatTimeRemaining(delegation.expiresAt - now)
           : 'never',
-        
+
         // Per-token expiration summary
         perTokenExpiration: expirations,
         hasMultipleExpirations,
-        
+
         // Summary message
-        message: summaryParts.length > 0 
+        message: summaryParts.length > 0
           ? summaryParts.join(', ')
           : 'Limits queried but amounts unclear.',
-        
+
         // Pre-formatted output for LLM to display
         showToUser,
-        
+
         // Source info
         source: 'MetaMask Smart Accounts Kit SDK',
-        
+
         // Tips
         tips: [
           'Available amount is what can still be spent in current period.',
@@ -990,22 +1061,32 @@ Use this after a failed transaction to understand the cause and explain to user.
       }
       
       if (diagnosis) {
-        // Build available limits summary - check BOTH native and ERC-20
+        // Build available limits summary with per-token expirations
         const limitsInfo = [];
+        const expirationInfo = [];
+        const now = Math.floor(Date.now() / 1000);
+
         if (availableLimits?.nativeToken?.availableEth) {
           limitsInfo.push(`ETH remaining: ${availableLimits.nativeToken.availableEth}`);
+          const nativeExpiry = availableLimits.nativeToken.expiresAt;
+          if (nativeExpiry && nativeExpiry > now) {
+            expirationInfo.push(`ETH permissions expire in ${formatTimeRemaining(nativeExpiry - now)} (${new Date(nativeExpiry * 1000).toLocaleDateString()})`);
+          }
         }
-        // Fix: Use erc20 not tokens!
         if (availableLimits?.erc20) {
           for (const [tokenAddr, tokenData] of Object.entries(availableLimits.erc20)) {
             if (tokenData.availableFormatted || tokenData.availableUnits) {
               const symbol = tokenData.tokenSymbol || 'Token';
               const available = tokenData.availableFormatted || tokenData.availableUnits;
               limitsInfo.push(`${symbol} remaining: ${available}`);
+              const tokenExpiry = tokenData.expiresAt;
+              if (tokenExpiry && tokenExpiry > now) {
+                expirationInfo.push(`${symbol} permissions expire in ${formatTimeRemaining(tokenExpiry - now)} (${new Date(tokenExpiry * 1000).toLocaleDateString()})`);
+              }
             }
           }
         }
-        
+
         // Build limits object with both ETH and ERC-20
         const allLimits = {};
         if (availableLimits?.nativeToken?.availableEth) {
@@ -1017,7 +1098,17 @@ Use this after a failed transaction to understand the cause and explain to user.
             allLimits[symbol] = tokenData.availableFormatted || tokenData.availableUnits;
           }
         }
-        
+
+        // Build expiration display - show per-token if they differ, single if same
+        let expirationDisplay = '';
+        if (expirationInfo.length > 1) {
+          expirationDisplay = `\n**Permission Expiration:**\n${expirationInfo.map(e => `- ${e}`).join('\n')}`;
+        } else if (expirationInfo.length === 1) {
+          expirationDisplay = `\n**${expirationInfo[0]}**`;
+        } else if (delegationStatus?.expiresIn) {
+          expirationDisplay = `\n**Delegation expires in:** ${delegationStatus.expiresIn}`;
+        }
+
         return {
           errorMessage,
           diagnosis: diagnosis.diagnosis,
@@ -1027,10 +1118,10 @@ Use this after a failed transaction to understand the cause and explain to user.
           affectedScope: diagnosis.scope,
           delegationStatus,
           availableLimits: Object.keys(allLimits).length > 0 ? allLimits : null,
-          
+
           // Actionable next steps for the LLM to suggest
           nextSteps: getNextSteps(diagnosis.diagnosis),
-          
+
           // Pre-formatted summary for LLM to display
           showToUser: `**Transfer Failed**
 
@@ -1038,7 +1129,7 @@ Use this after a failed transaction to understand the cause and explain to user.
 
 **What happened:** ${diagnosis.meaning}
 ${limitsInfo.length > 0 ? `\n**Current Limits:**\n${limitsInfo.map(l => `- ${l}`).join('\n')}` : ''}
-${delegationStatus?.expiresIn ? `\n**Delegation expires in:** ${delegationStatus.expiresIn}` : ''}
+${expirationDisplay}
 
 **How to fix:**
 ${diagnosis.solution}

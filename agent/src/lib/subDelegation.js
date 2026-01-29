@@ -6,11 +6,42 @@
  * Delegation chain:
  * 1. User grants delegation to Companeon (root, authority = ROOT_AUTHORITY)
  * 2. Companeon creates sub-delegation to DCA/Transfer Agent (authority = hash of parent)
+ *    with scoped caveats that narrow the parent's permissions
  * 3. Agent executes with both delegations: [sub-delegation, parent-delegation]
+ *
+ * Sub-delegation caveats are accumulative: the DelegationManager validates ALL caveats
+ * across the entire chain. Sub-delegation caveats can only narrow (never widen) parent
+ * permissions.
  */
 
 import { ethers } from 'ethers';
 import { Firestore } from '@google-cloud/firestore';
+
+// Lazy-load SDK dependencies for caveat building
+let sdkModule = null;
+let sdkUtilsModule = null;
+
+async function getSDK() {
+  if (!sdkModule) {
+    sdkModule = await import('@metamask/smart-accounts-kit');
+  }
+  return sdkModule;
+}
+
+async function getSDKUtils() {
+  if (!sdkUtilsModule) {
+    sdkUtilsModule = await import('@metamask/smart-accounts-kit/utils');
+  }
+  return sdkUtilsModule;
+}
+
+// Map frequency strings to period durations in seconds
+const FREQUENCY_TO_SECONDS = {
+  hourly: 3600,
+  daily: 86400,
+  weekly: 604800,
+  test: 120
+};
 
 let firestoreClient = null;
 function getFirestore() {
@@ -62,6 +93,87 @@ export function getDelegationHash(delegation) {
 }
 
 /**
+ * Build scoped caveats for a sub-delegation using the SDK's CaveatBuilder.
+ *
+ * Caveats narrow the parent delegation's permissions. Available caveat types:
+ * - nativeTokenPeriodTransfer: limit ETH per period (e.g., 0.001 ETH/day)
+ * - erc20PeriodTransfer: limit ERC-20 per period
+ * - allowedTargets: restrict to specific recipient addresses
+ * - timestamp: enforce an expiration time
+ *
+ * @param {object} caveatConfig - Configuration for caveats
+ * @param {string} caveatConfig.token - Token symbol (e.g., "ETH", "USDC")
+ * @param {string} caveatConfig.amount - Amount per period (human-readable, e.g., "0.001")
+ * @param {string} caveatConfig.frequency - Period frequency ("hourly", "daily", "weekly", "test")
+ * @param {string} [caveatConfig.recipient] - Restrict transfers to this address
+ * @param {string} [caveatConfig.tokenAddress] - ERC-20 token contract address
+ * @param {number} [caveatConfig.decimals] - Token decimals (default 18 for ETH)
+ * @param {number} [caveatConfig.expiresAt] - Unix timestamp for sub-delegation expiry
+ * @param {number} chainId - Chain ID for environment lookup
+ * @param {object} [logger] - Optional logger
+ * @returns {Array} Array of Caveat objects { enforcer, terms, args }
+ */
+async function buildSubDelegationCaveats(caveatConfig, chainId, logger) {
+  if (!caveatConfig) return [];
+
+  const { token, amount, frequency, recipient, tokenAddress, decimals, expiresAt } = caveatConfig;
+  const { getSmartAccountsEnvironment } = await getSDK();
+  const { createCaveatBuilder } = await getSDKUtils();
+
+  const environment = getSmartAccountsEnvironment(chainId);
+  const builder = createCaveatBuilder(environment);
+
+  const isNative = !token || token.toUpperCase() === 'ETH';
+  const periodDuration = FREQUENCY_TO_SECONDS[frequency] || FREQUENCY_TO_SECONDS.daily;
+  const startDate = Math.floor(Date.now() / 1000);
+
+  if (isNative && amount) {
+    const periodAmountWei = ethers.parseEther(amount);
+    builder.addCaveat('nativeTokenPeriodTransfer', {
+      periodAmount: periodAmountWei,
+      periodDuration,
+      startDate
+    });
+    logger?.info?.('sub_delegation_caveat_native', {
+      amount, periodDuration, startDate
+    });
+  }
+
+  if (!isNative && amount && tokenAddress) {
+    const tokenDecimals = decimals || 6;
+    const periodAmountUnits = BigInt(Math.round(parseFloat(amount) * Math.pow(10, tokenDecimals)));
+    builder.addCaveat('erc20PeriodTransfer', {
+      tokenAddress,
+      periodAmount: periodAmountUnits,
+      periodDuration,
+      startDate
+    });
+    logger?.info?.('sub_delegation_caveat_erc20', {
+      token, amount, tokenAddress, periodDuration, startDate
+    });
+  }
+
+  if (recipient) {
+    builder.addCaveat('allowedTargets', {
+      targets: [recipient]
+    });
+    logger?.info?.('sub_delegation_caveat_targets', { recipient });
+  }
+
+  if (expiresAt) {
+    builder.addCaveat('timestamp', {
+      afterThreshold: 0,
+      beforeThreshold: expiresAt
+    });
+    logger?.info?.('sub_delegation_caveat_timestamp', { expiresAt });
+  }
+
+  const caveats = builder.build();
+  logger?.info?.('sub_delegation_caveats_built', { count: caveats.length });
+  return caveats;
+}
+
+/**
  * Create a sub-delegation metadata object; signing happens at execution time.
  */
 export async function createSubDelegation({
@@ -69,6 +181,7 @@ export async function createSubDelegation({
   companeonKey,
   dcaAgentAddress,
   limits,
+  caveatConfig,
   delegationManager,
   chainId,
   logger
@@ -83,17 +196,25 @@ export async function createSubDelegation({
   }
   logger?.info?.('sub_delegation_parent', { parentHash: parentHash.slice(0, 18) });
 
-  // Build a minimal sub-delegation (no caveats here – limits enforced by parent)
+  // Build scoped caveats that narrow the parent delegation's permissions
+  const caveats = await buildSubDelegationCaveats(caveatConfig, chainId, logger);
+
   const subDelegation = {
     delegate: dcaAgentAddress,
     delegator: companeonWallet.address,
     authority: parentHash,
-    caveats: [],
+    caveats,
     salt: BigInt(Date.now()),
     signature: '0x'
   };
 
-  // Sign EIP-712 delegation
+  logger?.info?.('sub_delegation_created', {
+    delegate: dcaAgentAddress,
+    caveatCount: caveats.length,
+    hasScopedCaveats: caveats.length > 0
+  });
+
+  // Sign EIP-712 delegation (caveats must be included in the signed data)
   async function signDelegationEip712(delegation, signer, dmAddress, cid) {
     const domain = { name: 'DelegationManager', version: '1', chainId: cid, verifyingContract: dmAddress };
     const types = {
@@ -106,11 +227,16 @@ export async function createSubDelegation({
         { name: 'salt', type: 'uint256' }
       ]
     };
+    // Include actual caveats in signed data (enforcer + terms only, not args)
+    const signableCaveats = (delegation.caveats || []).map(c => ({
+      enforcer: c.enforcer,
+      terms: c.terms
+    }));
     const value = {
       delegate: delegation.delegate,
       delegator: delegation.delegator,
       authority: delegation.authority,
-      caveats: [],
+      caveats: signableCaveats,
       salt: delegation.salt.toString()
     };
     return await signer.signTypedData(domain, types, value);
@@ -124,6 +250,7 @@ export async function createSubDelegation({
     parentHash,
     to: dcaAgentAddress,
     limits: limits || null,
+    caveatConfig: caveatConfig || null,
     delegationManager,
     chainId,
     createdAt: Date.now(),
@@ -149,4 +276,23 @@ export async function getSubDelegation(walletAddress, scheduleId) {
   const docRef = db.collection('SubDelegations').doc(`${normalized}_${scheduleId}`);
   const doc = await docRef.get();
   return doc.exists ? doc.data() : null;
+}
+
+/**
+ * Get all sub-delegations for a wallet address.
+ */
+export async function getSubDelegationsForWallet(walletAddress) {
+  const db = getFirestore();
+  const normalized = walletAddress.toLowerCase();
+  const snapshot = await db.collection('SubDelegations')
+    .where('walletAddress', '==', normalized)
+    .get();
+
+  if (snapshot.empty) return [];
+
+  const results = [];
+  snapshot.forEach(doc => {
+    results.push({ id: doc.id, ...doc.data() });
+  });
+  return results;
 }

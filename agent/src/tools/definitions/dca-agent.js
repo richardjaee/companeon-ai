@@ -95,15 +95,34 @@ export const dcaAgentTools = [
       const scheduleId = `transfer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const nextRun = calculateNextRun(frequency);
 
-      // Create sub-delegation metadata (best-effort)
+      // Create sub-delegation with scoped caveats (best-effort)
       try {
         const transferAgentAddress = getDCAAgentAddress();
         const delegationData = await getDelegationDataForWallet(walletAddress, logger);
+
+        // Build caveat config to scope the sub-delegation
+        const caveatConfig = {
+          token: token.toUpperCase(),
+          amount,
+          frequency,
+          recipient
+        };
+        if (token.toUpperCase() !== 'ETH') {
+          const scope = (delegationData.scopes || []).find(s =>
+            s.tokenSymbol?.toUpperCase() === token.toUpperCase()
+          );
+          if (scope?.tokenAddress) {
+            caveatConfig.tokenAddress = scope.tokenAddress;
+            caveatConfig.decimals = scope.decimals;
+          }
+        }
+
         const subDelegationData = await createSubDelegation({
           parentPermissionsContext: delegationData.permissionsContext,
           companeonKey: process.env.BACKEND_DELEGATION_KEY,
           dcaAgentAddress: transferAgentAddress,
           limits: { token, amount },
+          caveatConfig,
           delegationManager: delegationData.delegationManager,
           chainId,
           logger

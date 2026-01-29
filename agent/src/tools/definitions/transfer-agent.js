@@ -9,7 +9,7 @@ import { z } from 'zod';
 import admin from 'firebase-admin';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 import { ethers } from 'ethers';
-import { createSubDelegation, storeSubDelegation } from '../../lib/subDelegation.js';
+import { createSubDelegation, storeSubDelegation, getSubDelegation } from '../../lib/subDelegation.js';
 import { getDelegationDataForWallet } from '../../lib/delegationSigner.js';
 
 // Firestore
@@ -97,12 +97,32 @@ export const transferAgentTools = [
       const transferAgentAddress = getTransferAgentAddress();
       const delegationData = await getDelegationDataForWallet(walletAddress, logger);
 
-      // Create sub-delegation metadata (signed data creation done at execution time)
+      // Build caveat config to scope the sub-delegation to this schedule's parameters
+      const caveatConfig = {
+        token: token.toUpperCase(),
+        amount,
+        frequency,
+        recipient
+      };
+
+      // For ERC-20 tokens, find the token address from parent delegation scopes
+      if (token.toUpperCase() !== 'ETH') {
+        const scope = (delegationData.scopes || []).find(s =>
+          s.tokenSymbol?.toUpperCase() === token.toUpperCase()
+        );
+        if (scope?.tokenAddress) {
+          caveatConfig.tokenAddress = scope.tokenAddress;
+          caveatConfig.decimals = scope.decimals;
+        }
+      }
+
+      // Create sub-delegation with scoped caveats (narrowed from parent permissions)
       const subDelegationData = await createSubDelegation({
         parentPermissionsContext: delegationData.permissionsContext,
         companeonKey: process.env.BACKEND_DELEGATION_KEY,
         dcaAgentAddress: transferAgentAddress,
         limits: { token, amount },
+        caveatConfig,
         delegationManager: delegationData.delegationManager,
         chainId,
         logger
@@ -165,12 +185,65 @@ export const transferAgentTools = [
         .where('walletAddress','==', walletAddress.toLowerCase())
         .limit(50).get();
       const rows = [];
-      qs.forEach(doc => {
+      for (const doc of qs.docs) {
         const d = doc.data();
-        if (status !== 'all' && d.status !== status) return;
-        rows.push({ id: d.scheduleId, token: d.token, amount: d.amount, recipient: d.recipient, frequency: d.frequency, status: d.status, nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null });
-      });
-      return { success: true, count: rows.length, schedules: rows };
+        if (status !== 'all' && d.status !== status) continue;
+
+        const row = {
+          id: d.scheduleId,
+          token: d.token,
+          amount: d.amount,
+          recipient: d.recipient,
+          frequency: d.frequency,
+          status: d.status,
+          executionCount: d.executionCount || 0,
+          nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
+          name: d.name || null
+        };
+
+        // Fetch sub-delegation caveat details if available
+        if (d.hasSubDelegation && d.scheduleId) {
+          try {
+            const subDel = await getSubDelegation(walletAddress, d.scheduleId);
+            if (subDel?.caveatConfig) {
+              row.scopedCaveats = {
+                amount: subDel.caveatConfig.amount,
+                frequency: subDel.caveatConfig.frequency,
+                recipient: subDel.caveatConfig.recipient || null,
+                token: subDel.caveatConfig.token,
+                hasScopedCaveats: true
+              };
+            }
+          } catch (e) {
+            // Sub-delegation lookup is best-effort
+          }
+        }
+
+        rows.push(row);
+      }
+
+      // Build formatted output
+      let showToUser = '';
+      if (rows.length > 0) {
+        showToUser = `**Recurring Transfers** (${rows.length})\n\n`;
+        for (const r of rows) {
+          const freqLabel = r.frequency === 'daily' ? '/day'
+            : r.frequency === 'weekly' ? '/week'
+            : r.frequency === 'hourly' ? '/hour'
+            : r.frequency === 'test' ? ' (test)'
+            : `/${r.frequency}`;
+          showToUser += `- **${r.amount} ${r.token}${freqLabel}** to \`${r.recipient}\` [${r.status}]`;
+          if (r.scopedCaveats?.hasScopedCaveats) showToUser += ' (scoped)';
+          if (r.nextRunAt) showToUser += `\n  Next: ${new Date(r.nextRunAt).toLocaleString()}`;
+          if (r.executionCount > 0) showToUser += ` | Runs: ${r.executionCount}`;
+          if (r.name) showToUser += ` | Name: ${r.name}`;
+          showToUser += '\n';
+        }
+      } else {
+        showToUser = `No ${status === 'all' ? '' : status + ' '}recurring transfers found.`;
+      }
+
+      return { success: true, count: rows.length, schedules: rows, showToUser };
     }
   },
   {
