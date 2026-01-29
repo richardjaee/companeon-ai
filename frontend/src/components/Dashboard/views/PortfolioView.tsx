@@ -19,6 +19,7 @@ import PermissionList from '@/components/PermissionList/PermissionList';
 import { AgentAsset } from '@/lib/smartAccount/types';
 import DisconnectConfirmModal from '@/components/Auth/DisconnectConfirmModal';
 import AuthModal from '@/components/Auth/AuthModal';
+import WalletConnectModal from '@/components/WalletConnectModal/WalletConnectModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { walletApi } from '@/lib/api/wallet';
 
@@ -83,6 +84,7 @@ export default function PortfolioView() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   
@@ -707,7 +709,15 @@ export default function PortfolioView() {
 
   const WalletButton = () => {
     if (!isConnected || !address) {
-      return null;
+      return (
+        <button
+          onClick={() => setShowConnectModal(true)}
+          className="flex items-center gap-2 px-4 py-2 rounded-[20px] bg-white hover:bg-gray-50 transition-colors"
+        >
+          <Image src="/icons/wallet-address-icon.png" alt="Wallet" className="w-5 h-5" width={20} height={20} />
+          <span className="text-sm font-medium text-black">Connect wallet</span>
+        </button>
+      );
     }
 
     const directAuthCheck = isConnected;
@@ -1021,6 +1031,11 @@ export default function PortfolioView() {
       <DisconnectConfirmModal
         isOpen={showDisconnectModal}
         onClose={() => setShowDisconnectModal(false)}
+      />
+
+      <WalletConnectModal
+        isOpen={showConnectModal}
+        onClose={() => setShowConnectModal(false)}
       />
 
       {/* Agent Permissions Bottom Sheet */}

@@ -409,6 +409,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       return null;
     }
 
+    // Respect persisted disconnect flags across page refreshes
+    try {
+      const userDisconnected = localStorage.getItem('companeon_user_disconnected') === 'true' ||
+        sessionStorage.getItem('companeon_user_disconnected') === 'true';
+      const preventAutoConnect = localStorage.getItem('companeon_prevent_auto_connect') === 'true' ||
+        sessionStorage.getItem('companeon_prevent_auto_connect') === 'true';
+      if (userDisconnected || preventAutoConnect) {
+        return null;
+      }
+    } catch (_) {}
+
+
     if (chainType && chainType !== 'ethereum') {
       return null;
     }

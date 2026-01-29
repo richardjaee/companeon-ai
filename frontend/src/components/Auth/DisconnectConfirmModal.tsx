@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useWallet } from '@/context/WalletContext';
 
 interface DisconnectConfirmModalProps {
@@ -43,7 +42,6 @@ const DisconnectConfirmModal: React.FC<DisconnectConfirmModalProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
   const { disconnectWallet } = useWallet();
   
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -52,51 +50,44 @@ const DisconnectConfirmModal: React.FC<DisconnectConfirmModalProps> = ({
     try {
       setIsLoading(true);
       setError(null);
-      
-      try {
 
-        localStorage.setItem('companeon_block_dashboard_redirect', 'true');
-        
-        localStorage.setItem('prevent_auto_reconnect', 'true');
-      } catch (err) {
-
-      }
-      
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-      
+
       timeoutRef.current = setTimeout(() => {
         if (isLoading) {
           setIsLoading(false);
           setError('Disconnect operation timed out. Please try again.');
         }
       }, 5000);
-      
+
       await disconnectWallet();
-      
+
+      // Set disconnect flags AFTER disconnectWallet completes
+      // These must be set after because disconnectWallet clears storage
+      try {
+        localStorage.setItem('companeon_prevent_auto_connect', 'true');
+        localStorage.setItem('companeon_user_disconnected', 'true');
+        sessionStorage.setItem('companeon_prevent_auto_connect', 'true');
+        sessionStorage.setItem('companeon_user_disconnected', 'true');
+      } catch (err) {
+        // Storage errors are non-fatal
+      }
+
       clearLegacySessionStorage();
-      
+
       if (onComplete) {
         onComplete();
       }
-      
+
       onClose();
-      
-      router.push('/');
-      
-      setTimeout(() => {
-        try {
-          localStorage.removeItem('companeon_block_dashboard_redirect');
-          } catch (e) {
-          }
-      }, 60000);
-      
+
       setIsLoading(false);
-      
+
     } catch (error: any) {
       setError(error.message || 'Failed to disconnect wallet. Please try again.');
-      
+
       setIsLoading(false);
     } finally {
 
