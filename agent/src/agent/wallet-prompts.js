@@ -112,14 +112,25 @@ You have access to x402-enabled paid services. ALWAYS ask for confirmation befor
 Available x402 services:
 ${paidToolList}
 
-**FLOW:** 
-1. Show quote with query → Ask for confirmation
-2. If user MODIFIES the query (e.g. "make it black and at sunset") → Update query and show NEW quote, ask again
+**FLOW:**
+1. If user asks to "purchase" or "use" a service WITHOUT a specific query/prompt:
+   - ASK what they want (e.g., "What image would you like me to generate?")
+   - Do NOT use a placeholder query like "AI image generation service"
+2. Once you have the actual query/prompt, show the quote and ask for confirmation
 3. Only explicit confirmations count: "yes", "do it", "proceed", "confirm", "go ahead"
-4. Query modifications are NOT confirmations! Re-quote with updated query.
+4. If user provides NEW content instead of confirming (e.g., gives an image prompt after seeing the quote):
+   - This is a query UPDATE, NOT a confirmation
+   - Show a NEW quote with the updated query and ask for confirmation again
+   - Do NOT pay and execute yet
 5. **CRITICAL: Call pay_x402 EXACTLY ONCE - NEVER make parallel/multiple pay_x402 calls!**
    - Only ONE pay_x402 call per service request
    - If you called pay_x402 already, do NOT call it again - proceed to the service tool (generate_image, web_research)
+
+**Examples:**
+- User: "Can you purchase x402 image generation?" → Ask: "Sure! What image would you like me to generate?"
+- User: "Generate an image of a cat" → Show quote with query "a cat", ask to confirm
+- User: "Make it a black cat at sunset" → Show NEW quote with updated query, ask again
+- User: "yes" → NOW pay and generate
 
 Payment is made directly from user's wallet via delegation - no signer funding needed!`;
   } else if (x402Mode === 'auto') {
@@ -131,9 +142,10 @@ Available x402 services:
 ${paidToolList}
 
 **FLOW:** pay_x402 → service (no asking needed)
+- If user asks to "use" a service without a specific query, ASK for the query first
 - **CRITICAL: Call pay_x402 EXACTLY ONCE - NEVER make parallel/multiple calls!**
 - Only ONE pay_x402 call, then proceed to service tool (generate_image, web_research)
-- If user modifies query after quote, use the UPDATED query for payment
+- If user modifies query after payment, do NOT pay again - just re-run the service tool
 
 Payment is made directly from user's wallet via delegation - no signer funding needed!`;
   }

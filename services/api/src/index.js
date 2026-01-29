@@ -986,7 +986,7 @@ app.get('/prices/cache', async (req, res) => {
  */
 app.get('/agent/tools', async (req, res) => {
   // Proxy to agent service
-  const agentUrl = process.env.AGENT_SERVICE_URL || 'https://companeon-agent-440170696844.us-central1.run.app';
+  const agentUrl = process.env.AGENT_SERVICE_URL;
   try {
     const response = await fetch(`${agentUrl}/health`);
     const data = await response.json();
@@ -1366,7 +1366,7 @@ app.post('/companeon/create-live-session', async (req, res) => {
  * POST /companeon/stream - Stream agent messages (legacy route, proxies to agent service)
  */
 app.post('/companeon/stream', async (req, res) => {
-  const agentUrl = process.env.AGENT_SERVICE_URL || 'https://companeon-agent-440170696844.us-central1.run.app';
+  const agentUrl = process.env.AGENT_SERVICE_URL;
   const apiKey = process.env.INTERNAL_API_KEY;
 
   try {

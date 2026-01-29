@@ -1601,7 +1601,7 @@ export default function CompaneonChatInterface({
               
             } else if (event.type === 'generated_image') {
               // Image generated - store to attach to final LLM response
-              
+
               currentImageData = {
                 dataUrl: event.imageUrl,
                 prompt: event.prompt,

@@ -13,7 +13,7 @@ export const config = {
 
 
 // API service base URL for chat endpoints
-const API_SERVICE_URL = process.env.API_SERVICE_URL || 'https://companeon-api-440170696844.us-central1.run.app';
+const API_SERVICE_URL = process.env.API_SERVICE_URL;
 
 const endpointMap: { [key: string]: string | undefined } = {
   GET_TOKENS: process.env.GET_TOKENS_URL,
