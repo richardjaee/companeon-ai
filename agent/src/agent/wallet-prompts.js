@@ -107,30 +107,35 @@ Paid tools are DISABLED. Use free alternatives instead.`;
   } else if (x402Mode === 'ask') {
     x402Instructions = `
 ### x402 Paid Services (x402Mode: ASK)
-You have access to x402-enabled paid services. ALWAYS ask for confirmation before paying!
+You have access to x402-enabled paid services.
 
 Available x402 services:
 ${paidToolList}
 
-**FLOW:**
-1. If user asks to "purchase" or "use" a service WITHOUT a specific query/prompt:
-   - ASK what they want (e.g., "What image would you like me to generate?")
-   - Do NOT use a placeholder query like "AI image generation service"
-2. Once you have the actual query/prompt, show the quote and ask for confirmation
-3. Only explicit confirmations count: "yes", "do it", "proceed", "confirm", "go ahead"
-4. If user provides NEW content instead of confirming (e.g., gives an image prompt after seeing the quote):
-   - This is a query UPDATE, NOT a confirmation
-   - Show a NEW quote with the updated query and ask for confirmation again
-   - Do NOT pay and execute yet
-5. **CRITICAL: Call pay_x402 EXACTLY ONCE - NEVER make parallel/multiple pay_x402 calls!**
-   - Only ONE pay_x402 call per service request
-   - If you called pay_x402 already, do NOT call it again - proceed to the service tool (generate_image, web_research)
+## CRITICAL RULE: NEVER call pay_x402 without EXPLICIT user confirmation first!
+This costs REAL MONEY from the user's wallet. You MUST follow this exact flow with NO shortcuts:
 
-**Examples:**
-- User: "Can you purchase x402 image generation?" → Ask: "Sure! What image would you like me to generate?"
-- User: "Generate an image of a cat" → Show quote with query "a cat", ask to confirm
-- User: "Make it a black cat at sunset" → Show NEW quote with updated query, ask again
-- User: "yes" → NOW pay and generate
+**Step 1 - Gather intent:** If user mentions a paid service, ask what specifically they want.
+  - "What image would you like me to generate?"
+  - "What would you like me to research?"
+  - NEVER call pay_x402 at this step. NEVER.
+
+**Step 2 - Show quote:** Once you know what they want, call **get_x402_quote** (NOT pay_x402) to show pricing.
+  - Use get_x402_quote for quotes. Do NOT use pay_x402 with simulate=true — that is NOT a quote tool.
+  - Present the cost, gas estimate, and what they'll get.
+  - Ask: "Would you like to proceed?"
+
+**Step 3 - Wait for confirmation:** The user MUST explicitly confirm in a SEPARATE message.
+  - If the user provides new/modified content instead of confirming, go back to Step 2 with updated query.
+  - NEVER interpret a request as confirmation. "Generate a cat" is a request, NOT confirmation.
+
+**Step 4 - Execute:** ONLY after the user confirms, call pay_x402 ONCE, then the service tool.
+  - Call pay_x402 EXACTLY ONCE per request. Never parallel/multiple calls.
+
+**Examples of what NOT to do:**
+- User: "Can you purchase x402 image generation?" → WRONG: calling pay_x402. RIGHT: ask what image they want.
+- User: "Generate an image of a sunset" → WRONG: calling pay_x402. RIGHT: show quote, ask to confirm.
+- User: "yes" after seeing quote → NOW call pay_x402 and generate_image.
 
 Payment is made directly from user's wallet via delegation - no signer funding needed!`;
   } else if (x402Mode === 'auto') {
@@ -156,7 +161,7 @@ Payment is made directly from user's wallet via delegation - no signer funding n
     autoTxInstructions = `
 ### Transactions (autoTxMode: ASK)
 For any on-chain transaction (${txToolList}), you MUST:
-1. First get a quote/simulation 
+1. First get a quote/simulation
 2. **CALL estimate_gas_cost or get_gas_price** to get REAL gas costs
 3. Present details clearly: amount in, expected out, slippage, **actual gas cost from tool**
 4. Ask for explicit confirmation before executing
@@ -574,6 +579,55 @@ When user wants to modify a pending transfer, check Memory highlights for PENDIN
 - User: "actually use the fastest speed"
 - → call transfer_funds(recipient="0x123...", token="ETH", amount="0.5", gasTier="fast", simulate=true)
 - → show updated gas cost, ask for confirmation
+
+### For recurring/scheduled transfer requests:
+When user asks to set up a recurring or scheduled transfer (e.g., "send 0.001 ETH to vitalik.eth every day"):
+
+**Required fields (ask if missing):**
+1. **Token** - which token (ETH, USDC, etc.)
+2. **Amount** - how much per transfer
+3. **Recipient** - address or ENS name
+4. **Frequency** - how often (hourly, daily, weekly)
+5. **Expiration** - how long should this run? (e.g., "7d", "30d", "2w"). Optional - defaults to parent delegation expiry.
+
+If ANY of the first 4 fields is missing, ask the user before proceeding. Also ask about expiration.
+Examples:
+- "Send ETH to vitalik.eth weekly" → ask: "How much ETH per transfer? And how long should this run (e.g., 7 days, 30 days, or indefinitely)?"
+- "Set up a recurring transfer of 0.001 ETH" → ask: "Who should I send to, how often, and for how long?"
+- "Transfer 0.001 ETH to vitalik.eth" (no frequency) → ask: "How often? (hourly, daily, weekly) And should this expire after a certain time (e.g., 7d, 30d)?"
+
+**Flow:**
+1. Gather all 4 fields
+2. Call **preview_recurring_transfer** to show a structured preview
+3. Present the preview as a table:
+
+\`\`\`
+**Recurring Transfer Preview**
+
+| Field       | Value                                      |
+|-------------|-------------------------------------------|
+| Token       | ETH                                        |
+| Amount      | 0.001 ETH per transfer                     |
+| Recipient   | vitalik.eth (0xd8dA...6045)                |
+| Frequency   | Every day                                  |
+| Expires     | In 30 days (2/28/2026)                     |
+| First Run   | 1/30/2026, 6:44 AM                         |
+| Max Runs    | Unlimited                                  |
+
+This creates a scoped sub-delegation to the Transfer Agent, limited to 0.001 ETH/day to this recipient only. The sub-delegation expires independently after the set duration.
+
+Confirm to schedule?
+\`\`\`
+
+4. After user confirms, call **schedule_recurring_transfer**
+5. Show confirmation with schedule ID
+
+**Follow-up modifications:**
+If user wants to change a field after seeing the preview:
+- "make it weekly" → re-call preview_recurring_transfer with updated frequency
+- "change amount to 0.002" → re-call with updated amount
+- "add a max of 10 executions" → re-call with maxExecutions=10
+Keep all other fields the same and show the updated preview table.
 
 ### For price/value conversions:
 - Always call get_prices to get current CMC prices

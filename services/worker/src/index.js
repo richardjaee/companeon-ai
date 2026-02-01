@@ -2,8 +2,8 @@
  * Companeon Worker Service
  *
  * Handles background jobs:
- * - DCA agent execution (scheduled)
- * - Cleanup tasks (scheduled)
+ * - Transfer agent execution (every 5 minutes)
+ * - Cleanup tasks (every 30 minutes)
  * - Manual trigger endpoints
  */
 
@@ -13,7 +13,7 @@ import dotenv from 'dotenv';
 import { Firestore } from '@google-cloud/firestore';
 
 // Jobs
-import { runDCAAgent } from './jobs/dcaAgent.js';
+import { runTransferAgent } from './jobs/dcaAgent.js';
 import { cleanupExpired } from './jobs/cleanup.js';
 
 dotenv.config();
@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
     service: 'companeon-worker',
     timestamp: new Date().toISOString(),
     jobs: {
-      dcaAgent: dcaJobStatus,
+      transferAgent: transferAgentJobStatus,
       cleanup: cleanupJobStatus
     }
   });
@@ -50,24 +50,34 @@ app.get('/health', (req, res) => {
 // ========================================
 // Job Status Tracking
 // ========================================
-let dcaJobStatus = { lastRun: null, status: 'idle', nextRun: null };
+let transferAgentJobStatus = { lastRun: null, status: 'idle', nextRun: null };
 let cleanupJobStatus = { lastRun: null, status: 'idle', nextRun: null };
 
 // ========================================
 // Manual Trigger Endpoints
 // ========================================
-app.post('/jobs/dca', async (req, res) => {
+app.post('/jobs/transfers', async (req, res) => {
   try {
-    console.log('Manual DCA agent triggered');
-    dcaJobStatus.status = 'running';
-    const result = await runDCAAgent(firestore);
-    dcaJobStatus.status = 'idle';
-    dcaJobStatus.lastRun = new Date().toISOString();
+    console.log('Manual transfer agent triggered');
+    transferAgentJobStatus.status = 'running';
+    const result = await runTransferAgent(firestore);
+    transferAgentJobStatus.status = 'idle';
+    transferAgentJobStatus.lastRun = new Date().toISOString();
     res.json({ success: true, ...result });
   } catch (error) {
-    dcaJobStatus.status = 'error';
-    console.error('DCA agent error:', error);
-    res.status(500).json({ error: 'Failed to run DCA agent' });
+    transferAgentJobStatus.status = 'error';
+    console.error('Transfer agent error:', error);
+    res.status(500).json({ error: 'Failed to run transfer agent' });
+  }
+});
+
+// Backwards-compatible alias
+app.post('/jobs/dca', async (req, res) => {
+  try {
+    const result = await runTransferAgent(firestore);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to run transfer agent' });
   }
 });
 
@@ -90,21 +100,21 @@ app.post('/jobs/cleanup', async (req, res) => {
 // Scheduled Jobs (using node-cron)
 // ========================================
 
-// Run DCA agent every hour
-if (process.env.ENABLE_DCA_AGENT !== 'false') {
-  cron.schedule('0 * * * *', async () => {
-    console.log('Running scheduled DCA agent...');
-    dcaJobStatus.status = 'running';
+// Run transfer agent every 5 minutes
+if (process.env.ENABLE_TRANSFER_AGENT !== 'false') {
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('Running scheduled transfer agent...');
+    transferAgentJobStatus.status = 'running';
     try {
-      await runDCAAgent(firestore);
-      dcaJobStatus.status = 'idle';
-      dcaJobStatus.lastRun = new Date().toISOString();
+      await runTransferAgent(firestore);
+      transferAgentJobStatus.status = 'idle';
+      transferAgentJobStatus.lastRun = new Date().toISOString();
     } catch (error) {
-      dcaJobStatus.status = 'error';
-      console.error('Scheduled DCA agent error:', error);
+      transferAgentJobStatus.status = 'error';
+      console.error('Scheduled transfer agent error:', error);
     }
   });
-  console.log('DCA agent job scheduled (every hour)');
+  console.log('Transfer agent job scheduled (every 5 minutes)');
 }
 
 // Cleanup expired auth/sessions every 30 minutes (matches session TTL)

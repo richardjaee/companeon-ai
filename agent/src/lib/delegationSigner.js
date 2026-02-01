@@ -375,7 +375,15 @@ export class DelegationSigner {
         gasUsed: receipt.gasUsed.toString(),
         status: receipt.status
       });
-      
+
+      // Check for on-chain revert (status 0 means the tx was mined but reverted)
+      if (receipt.status === 0) {
+        const error = new Error('Transaction reverted on-chain after being mined. The delegation enforcer rejected the operation.');
+        error.code = 'TX_REVERTED';
+        error.txHash = redeemTx.hash;
+        throw error;
+      }
+
       return receipt;
       
     } catch (error) {
@@ -461,9 +469,17 @@ export class DelegationSigner {
       
       this.logger?.info?.('delegation_batch_confirmed', {
         txHash: redeemTx.hash,
-        gasUsed: receipt.gasUsed.toString()
+        gasUsed: receipt.gasUsed.toString(),
+        status: receipt.status
       });
-      
+
+      if (receipt.status === 0) {
+        const error = new Error('Batch transaction reverted on-chain after being mined. The delegation enforcer rejected the operation.');
+        error.code = 'TX_REVERTED';
+        error.txHash = redeemTx.hash;
+        throw error;
+      }
+
       return receipt;
       
     } catch (error) {

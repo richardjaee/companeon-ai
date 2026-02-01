@@ -228,7 +228,7 @@ async function getQuote(tokenIn, tokenOut, amountIn, chainId = null, options = {
   // For Sepolia: Go directly to mainnet for quotes (skip local quoter)
   if (config.chainId === 11155111) {
     const mainnetAddresses = getAddressesForChain(1);
-    const mainnetProvider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
+    const mainnetProvider = new ethers.JsonRpcProvider(process.env.ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com');
     const mainnetQuoter = new ethers.Contract(mainnetAddresses.QUOTER_V2, QUOTER_ABI, mainnetProvider);
     
     // Token addresses should already be mainnet addresses (from getTokenInfo with forQuote: true)

@@ -15,7 +15,6 @@ import { researchTools } from './research.js';
 import { delegationTools } from './delegation.js';
 import { gasTools } from './gas.js';
 import { envioTools } from './envio.js';
-import { dcaAgentTools } from './dca-agent.js';
 import { transferAgentTools } from './transfer-agent.js';
 import { autonomousAgentTools } from './autonomous-agents.js';
 import { aggregatorTools } from './aggregator.js';
@@ -86,9 +85,6 @@ export function registerWalletTools(registry) {
   }
 
   // A2A / Recurring transfer tools (agent-to-agent)
-  for (const tool of dcaAgentTools) {
-    registry.register(tool);
-  }
   for (const tool of transferAgentTools) {
     registry.register(tool);
   }

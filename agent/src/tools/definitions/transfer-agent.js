@@ -45,6 +45,56 @@ function formatFrequency(f) {
     : f;
 }
 
+/**
+ * Parse a human-readable duration string into seconds.
+ * Supports: "7d", "30d", "2w", "1h", "24h", "3m" (months)
+ * Returns null if unparseable.
+ */
+function parseDuration(durationStr) {
+  if (!durationStr) return null;
+  const match = durationStr.trim().toLowerCase().match(/^(\d+)\s*(h|d|w|m)$/);
+  if (!match) return null;
+  const num = parseInt(match[1], 10);
+  switch (match[2]) {
+    case 'h': return num * 3600;
+    case 'd': return num * 86400;
+    case 'w': return num * 604800;
+    case 'm': return num * 2592000; // ~30 days
+    default: return null;
+  }
+}
+
+function formatDuration(seconds) {
+  if (!seconds) return null;
+  const days = Math.floor(seconds / 86400);
+  if (days >= 30 && days % 30 === 0) return `${days / 30} month(s)`;
+  if (days >= 7 && days % 7 === 0) return `${days / 7} week(s)`;
+  if (days > 0) return `${days} day(s)`;
+  const hours = Math.floor(seconds / 3600);
+  return `${hours} hour(s)`;
+}
+
+/**
+ * Resolve ENS name to address via mainnet registry.
+ * Returns { address, ensName } or throws on failure.
+ */
+async function resolveRecipient(recipient, logger) {
+  if (recipient.endsWith('.eth')) {
+    const mainnetProvider = new ethers.JsonRpcProvider(process.env.ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com');
+    logger?.info?.('resolving_ens', { ensName: recipient });
+    const address = await mainnetProvider.resolveName(recipient);
+    if (!address) {
+      throw new Error(`Could not resolve ENS name: ${recipient}. Make sure the name exists on mainnet.`);
+    }
+    logger?.info?.('ens_resolved', { ensName: recipient, address });
+    return { address: ethers.getAddress(address), ensName: recipient };
+  }
+  if (!/^0x[a-fA-F0-9]{40}$/.test(recipient)) {
+    throw new Error('Valid recipient address (0x...) or ENS name (.eth) is required');
+  }
+  return { address: ethers.getAddress(recipient), ensName: null };
+}
+
 export const transferAgentTools = [
   {
     name: 'preview_recurring_transfer',
@@ -54,20 +104,32 @@ export const transferAgentTools = [
       amount: z.string(),
       recipient: z.string(),
       frequency: z.enum(['hourly', 'daily', 'weekly', 'test']),
+      expiresIn: z.string().optional().describe('Duration for sub-delegation expiry (e.g., "7d", "30d", "2w", "1m"). Defaults to parent delegation expiry.'),
       name: z.string().optional(),
       maxExecutions: z.number().optional()
     }),
     tags: ['transfer', 'schedule', 'a2a', 'agent', 'preview'],
     handler: async (params, context) => {
-      const { token, amount, recipient, frequency, name, maxExecutions } = params;
+      const { token, amount, recipient, frequency, expiresIn, name, maxExecutions } = params;
       const walletAddress = context?.walletAddress || context?.memoryFacts?.walletAddress;
+      const logger = context?.logger;
       if (!walletAddress) throw new Error('Wallet address required');
+
+      const { address, ensName } = await resolveRecipient(recipient, logger);
       const nextRun = calculateNextRun(frequency);
+
+      const durationSec = parseDuration(expiresIn);
+      const expiresAt = durationSec ? Math.floor(Date.now() / 1000) + durationSec : null;
+
       return {
         ask: true,
         preview: {
-          token: token.toUpperCase(), amount, recipient,
+          token: token.toUpperCase(), amount,
+          recipient: address,
+          recipientENS: ensName,
           frequency: formatFrequency(frequency),
+          expiresIn: durationSec ? formatDuration(durationSec) : 'Inherits parent delegation',
+          expiresAt: expiresAt ? new Date(expiresAt * 1000).toISOString() : null,
           name: name || null,
           firstExecution: nextRun.toLocaleString(),
           maxExecutions: maxExecutions || 'unlimited'
@@ -83,26 +145,35 @@ export const transferAgentTools = [
       amount: z.string(),
       recipient: z.string(),
       frequency: z.enum(['hourly', 'daily', 'weekly', 'test']),
+      expiresIn: z.string().optional().describe('Duration for sub-delegation expiry (e.g., "7d", "30d", "2w", "1m"). Defaults to parent delegation expiry.'),
       name: z.string().optional(),
       maxExecutions: z.number().optional()
     }),
     tags: ['transfer', 'schedule', 'a2a', 'agent', 'write'],
     handler: async (params, context) => {
-      const { token, amount, recipient, frequency, name, maxExecutions } = params;
+      const { token, amount, recipient, frequency, expiresIn, name, maxExecutions } = params;
       const walletAddress = context?.walletAddress || context?.memoryFacts?.walletAddress;
       const chainId = context?.chainId || context?.memoryFacts?.chainId || 8453;
       const logger = context?.logger;
       if (!walletAddress) throw new Error('Wallet address required');
 
+      // Resolve ENS name to address before scheduling
+      const { address: resolvedRecipient, ensName } = await resolveRecipient(recipient, logger);
+
       const transferAgentAddress = getTransferAgentAddress();
       const delegationData = await getDelegationDataForWallet(walletAddress, logger);
+
+      // Parse expiration duration into a unix timestamp
+      const durationSec = parseDuration(expiresIn);
+      const expiresAtTimestamp = durationSec ? Math.floor(Date.now() / 1000) + durationSec : null;
 
       // Build caveat config to scope the sub-delegation to this schedule's parameters
       const caveatConfig = {
         token: token.toUpperCase(),
         amount,
         frequency,
-        recipient
+        recipient: resolvedRecipient,
+        expiresAt: expiresAtTimestamp
       };
 
       // For ERC-20 tokens, find the token address from parent delegation scopes
@@ -116,9 +187,24 @@ export const transferAgentTools = [
         }
       }
 
+      // Select the correct parent permission context:
+      // Native ETH uses the primary context, ERC-20 uses the token-specific context
+      let parentContext = delegationData.permissionsContext;
+      if (token.toUpperCase() !== 'ETH' && caveatConfig.tokenAddress) {
+        const allContexts = delegationData.allPermissionContexts || {};
+        const tokenKey = caveatConfig.tokenAddress.toLowerCase();
+        const tokenContext = allContexts[tokenKey] || allContexts[caveatConfig.tokenAddress];
+        if (tokenContext) {
+          parentContext = tokenContext;
+          logger?.info?.('sub_delegation_using_erc20_parent_context', { token: token.toUpperCase(), tokenAddress: caveatConfig.tokenAddress });
+        } else {
+          logger?.warn?.('sub_delegation_no_erc20_context', { token: token.toUpperCase(), tokenAddress: caveatConfig.tokenAddress, availableContexts: Object.keys(allContexts) });
+        }
+      }
+
       // Create sub-delegation with scoped caveats (narrowed from parent permissions)
       const subDelegationData = await createSubDelegation({
-        parentPermissionsContext: delegationData.permissionsContext,
+        parentPermissionsContext: parentContext,
         companeonKey: process.env.BACKEND_DELEGATION_KEY,
         dcaAgentAddress: transferAgentAddress,
         limits: { token, amount },
@@ -145,9 +231,12 @@ export const transferAgentTools = [
         chainId,
         token: token.toUpperCase(),
         amount,
-        recipient,
+        recipient: resolvedRecipient,
+        recipientENS: ensName,
         frequency,
         maxExecutions: maxExecutions || null,
+        expiresAt: expiresAtTimestamp || null,
+        expiresIn: expiresIn || null,
         executionCount: 0,
         status: 'active',
         nextRunAt: Timestamp.fromDate(nextRun),
@@ -162,13 +251,32 @@ export const transferAgentTools = [
       };
       await db.collection(TRANSFER_SCHEDULE_COLLECTION).doc(scheduleId).set(schedule);
 
+      const recipientDisplay = ensName ? `${ensName} (${resolvedRecipient.slice(0, 6)}...${resolvedRecipient.slice(-4)})` : resolvedRecipient;
+      const expiresDisplay = expiresAtTimestamp
+        ? `${formatDuration(durationSec)} (${new Date(expiresAtTimestamp * 1000).toLocaleDateString()})`
+        : 'Inherits parent delegation';
+
       return {
         success: true,
         scheduleId,
         nextRun: nextRun.toISOString(),
         hasSubDelegation: !!subDelegationData,
+        hasScopedCaveats: !!(subDelegationData?.caveatConfig),
         transferAgentAddress,
-        showToUser: `Recurring transfer scheduled: ${amount} ${token.toUpperCase()} → ${recipient} (${formatFrequency(frequency)}). First execution: ${nextRun.toLocaleString()}. ID: ${scheduleId}`
+        recipientENS: ensName,
+        showToUser: `**Recurring Transfer Confirmed**
+
+| Field       | Value                                      |
+|-------------|-------------------------------------------|
+| Token       | ${token.toUpperCase()}                     |
+| Amount      | ${amount} ${token.toUpperCase()} per transfer |
+| Recipient   | ${recipientDisplay}                        |
+| Frequency   | ${formatFrequency(frequency)}              |
+| Expires     | ${expiresDisplay}                          |
+| First Run   | ${nextRun.toLocaleString()}                |
+| Max Runs    | ${maxExecutions || 'Unlimited'}            |
+
+Sub-delegation scoped to ${amount} ${token.toUpperCase()}/${frequency} to ${recipientDisplay} only.`
       };
     }
   },

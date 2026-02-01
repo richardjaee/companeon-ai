@@ -120,6 +120,8 @@ case "$1" in
         secrets=(
             "google-genai-api-key:Google AI/Gemini API Key"
             "backend-delegation-key:Backend delegation private key (hex)"
+            "transfer-agent-private-key:Transfer Agent private key (hex)"
+            "dca-agent-private-key:DCA Agent private key (hex)"
             "pplx-api-key:Perplexity API Key"
             "cmc-api-key:CoinMarketCap API Key"
             "envio-api-key:Envio API Key"
@@ -168,6 +170,8 @@ case "$1" in
         SECRET_PAIRS="
             GOOGLE_GENAI_API_KEY:google-genai-api-key
             BACKEND_DELEGATION_KEY:backend-delegation-key
+            TRANSFER_AGENT_PRIVATE_KEY:transfer-agent-private-key
+            DCA_AGENT_PRIVATE_KEY:dca-agent-private-key
             PRIVATE_KEY:agent-private-key
             PRIVATE_KEY_ETH:agent-private-key-eth
             GAS_SPONSOR_KEY:gas-sponsor-key

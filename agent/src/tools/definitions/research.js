@@ -861,8 +861,7 @@ Returns base64 encoded image that can be displayed inline.`,
         const imageId = storeImage(result.base64, result.mimeType);
         
         // Get base URL from environment
-        const baseUrl = process.env.PUBLIC_URL;
-        if (!baseUrl) throw new Error('PUBLIC_URL environment variable is required');
+        const baseUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 8080}`;
         const imageUrl = `${baseUrl}/images/${imageId}`;
         
         logger?.info?.('image_stored', { imageId, imageUrl });

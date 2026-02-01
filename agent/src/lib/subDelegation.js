@@ -154,10 +154,14 @@ async function buildSubDelegationCaveats(caveatConfig, chainId, logger) {
   }
 
   if (recipient) {
+    // For ERC-20, the on-chain execution target is the token contract (not the recipient),
+    // because the call is tokenContract.transfer(recipient, amount).
+    // For native ETH, the target IS the recipient (direct value transfer).
+    const target = !isNative && tokenAddress ? tokenAddress : recipient;
     builder.addCaveat('allowedTargets', {
-      targets: [recipient]
+      targets: [target]
     });
-    logger?.info?.('sub_delegation_caveat_targets', { recipient });
+    logger?.info?.('sub_delegation_caveat_targets', { target, recipient, isNative });
   }
 
   if (expiresAt) {

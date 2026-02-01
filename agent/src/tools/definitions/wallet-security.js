@@ -724,7 +724,7 @@ This helps warn users about first-time recipients. Uses Envio for fast, accurate
       if (recipient.endsWith('.eth')) {
         ensName = recipient;
         try {
-          const mainnetProvider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
+          const mainnetProvider = new ethers.JsonRpcProvider(process.env.ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com');
           resolvedRecipient = await mainnetProvider.resolveName(recipient);
           if (!resolvedRecipient) {
             return {

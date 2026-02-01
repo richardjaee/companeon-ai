@@ -278,8 +278,9 @@ export class Agent {
 
             // Check for IDENTICAL redundant calls (same tool + same args)
             // This allows same tool with different args (e.g., get_aggregated_quote for different chains)
-            const argsHash = JSON.stringify(args || {});
-            const callKey = `${name}:${argsHash}`;
+            // Sort keys to ensure consistent hashing regardless of key order from LLM
+            const sortedArgs = args ? JSON.stringify(args, Object.keys(args).sort()) : '{}';
+            const callKey = `${name}:${sortedArgs}`;
             const identicalCallCount = recentToolCalls.slice(-5).filter(t => t === callKey).length;
             if (identicalCallCount >= MAX_IDENTICAL_CALLS) {
               this.logger?.warn?.('skipping_identical_tool', { tool: name, args, identicalCount: identicalCallCount });
@@ -298,9 +299,8 @@ export class Agent {
             // Block IDENTICAL write operations (same tool + same args)
             // This allows multi-swaps (UNI→ETH, USDC→ETH) but blocks duplicate calls
             if (WRITE_TOOLS.includes(name)) {
-              // Create a hash of the args to identify identical calls
-              const argsHash = JSON.stringify(args || {});
-              const opKey = `${name}:${argsHash}`;
+              // Create a hash of the args to identify identical calls (sorted keys for consistency)
+              const opKey = `${name}:${sortedArgs}`;
               
               if (executedWriteOps.has(opKey)) {
                 this.logger?.warn?.('blocking_duplicate_write_op', { tool: name, args, alreadyExecuted: true });
@@ -355,7 +355,7 @@ export class Agent {
             }
             
             recentToolCalls.push(callKey);
-            
+
             emit({ type: 'tool_call', tool: name, input: args });
             this.logger?.info?.('tool_call', { tool: name, args });
 

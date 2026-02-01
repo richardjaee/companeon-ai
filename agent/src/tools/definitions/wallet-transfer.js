@@ -69,7 +69,7 @@ async function resolveENSName(ensName, chainId = null, logger = null) {
   try {
     // Always resolve against mainnet ENS (even for testnets)
     // This allows using mainnet names like "vitalik.eth" on any chain
-    const mainnetRpc = 'https://eth.llamarpc.com'; // Free public mainnet RPC
+    const mainnetRpc = process.env.ETH_MAINNET_RPC_URL || 'https://eth.llamarpc.com';
     const mainnetProvider = new ethers.JsonRpcProvider(mainnetRpc);
     
     logger?.info?.('resolving_ens', { ensName });

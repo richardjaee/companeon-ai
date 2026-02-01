@@ -82,7 +82,7 @@ sync-secrets:
 grant-secrets:
 	@echo "Granting Cloud Run service account access to secrets..."
 	@SA="$$(gcloud projects describe companeon --format='value(projectNumber)')-compute@developer.gserviceaccount.com"; \
-	for secret in google-genai-api-key backend-delegation-key agent-private-key agent-private-key-eth gas-sponsor-key cmc-api-key pplx-api-key envio-api-key zerox-api-key gateway-api-key internal-api-key alchemy-rpc-url sepolia-rpc-url; do \
+	for secret in google-genai-api-key backend-delegation-key agent-private-key agent-private-key-eth gas-sponsor-key transfer-agent-private-key dca-agent-private-key cmc-api-key pplx-api-key envio-api-key zerox-api-key gateway-api-key internal-api-key alchemy-rpc-url sepolia-rpc-url; do \
 		if gcloud secrets describe $$secret >/dev/null 2>&1; then \
 			gcloud secrets add-iam-policy-binding $$secret --member="serviceAccount:$$SA" --role="roles/secretmanager.secretAccessor" --quiet 2>/dev/null || true; \
 			echo "Granted access to $$secret"; \
@@ -94,7 +94,10 @@ grant-secrets:
 REGISTRY=us-central1-docker.pkg.dev/companeon/cloud-run-source-deploy
 
 # Agent secrets (referenced from Secret Manager)
-AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
+AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,DCA_AGENT_PRIVATE_KEY=dca-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest
+
+# Worker secrets (referenced from Secret Manager)
+WORKER_SECRETS=TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,DCA_AGENT_PRIVATE_KEY=dca-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,SEPOLIA_RPC_URL=sepolia-rpc-url:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
 
 # Quick Deploy DEV - local build + push (fast, uses Docker cache)
 deploy-agent-dev:
@@ -108,7 +111,7 @@ deploy-agent-dev:
 		--region us-central1 \
 		--allow-unauthenticated \
 		--update-secrets="$(AGENT_SECRETS)" \
-		--update-env-vars="SIGNER_MODE=DELEGATION,LOG_LEVEL=info,GOOGLE_CLOUD_PROJECT=companeon" \
+		--update-env-vars="SIGNER_MODE=DELEGATION,LOG_LEVEL=info,GOOGLE_CLOUD_PROJECT=companeon,PUBLIC_URL=https://companeon-agent-dev-440170696844.us-central1.run.app" \
 		--quiet
 	@echo "Done! https://companeon-agent-dev-440170696844.us-central1.run.app"
 
@@ -134,7 +137,8 @@ deploy-worker-dev:
 	@gcloud run deploy companeon-worker-dev \
 		--image $(REGISTRY)/worker:dev \
 		--region us-central1 \
-		--update-env-vars="NODE_ENV=development,GOOGLE_CLOUD_PROJECT=companeon" \
+		--update-secrets="$(WORKER_SECRETS)" \
+		--update-env-vars="NODE_ENV=development,GOOGLE_CLOUD_PROJECT=companeon,ENABLE_TRANSFER_AGENT=true" \
 		--quiet
 
 # Quick Deploy PROD - uses Cloud Build
