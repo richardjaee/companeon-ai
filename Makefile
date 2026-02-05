@@ -94,7 +94,7 @@ grant-secrets:
 REGISTRY=us-central1-docker.pkg.dev/companeon/cloud-run-source-deploy
 
 # Agent secrets (referenced from Secret Manager)
-AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,DCA_AGENT_PRIVATE_KEY=dca-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest
+AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,GOOGLE_AI_STUDIO_KEY=google-ai-studio-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,DCA_AGENT_PRIVATE_KEY=dca-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest
 
 # Worker secrets (referenced from Secret Manager)
 WORKER_SECRETS=TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,DCA_AGENT_PRIVATE_KEY=dca-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,SEPOLIA_RPC_URL=sepolia-rpc-url:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest

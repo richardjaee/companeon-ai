@@ -13,7 +13,8 @@ export class GeminiClient {
     this.apiKey = apiKey;
     this.models = models;
     this.currentModelIndex = 0;
-    this.baseUrl = 'https://aiplatform.googleapis.com/v1';
+    // Use Google AI API (supports thinking) instead of Vertex AI (doesn't)
+    this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   }
 
   get name() {
@@ -94,10 +95,11 @@ export class GeminiClient {
       contents,
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 2048
-        // thinkingConfig disabled - it outputs thinking IN the content,
-        // not in a separate field, which mixes thinking with responses.
-        // Modern agent approach: just show tool calls, no separate "thinking" text.
+        maxOutputTokens: 2048,
+        thinkingConfig: {
+          thinkingBudget: 1024, // Token budget for thinking
+          includeThoughts: true // Return thought summaries
+        }
       }
     };
 
@@ -126,7 +128,7 @@ export class GeminiClient {
       this.currentModelIndex = i;
       const modelName = this.models[i];
 
-      const url = `${this.baseUrl}/publishers/google/models/${modelName}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+      const url = `${this.baseUrl}/models/${modelName}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
 
       try {
         const response = await axios.post(url, body, {
@@ -141,11 +143,15 @@ export class GeminiClient {
 
         const parts = candidate.content?.parts || [];
         const functionCalls = parts.filter(p => p.functionCall);
-        const textParts = parts.filter(p => p.text);
+        // Separate thinking parts (thought: true) from regular text
+        const thoughtParts = parts.filter(p => p.text && p.thought === true);
+        const textParts = parts.filter(p => p.text && p.thought !== true);
+        const thinking = thoughtParts.map(p => p.text).join('').trim();
         const content = textParts.map(p => p.text).join('').trim();
 
         if (functionCalls.length > 0) {
           return {
+            thinking: thinking || null,
             content: content || null,
             toolCalls: functionCalls.map((fc, idx) => ({
               id: `${fc.functionCall.name}_${idx}_${Date.now()}`,
@@ -156,6 +162,7 @@ export class GeminiClient {
         }
 
         return {
+          thinking: thinking || null,
           content: content || null,
           toolCalls: []
         };
@@ -192,7 +199,7 @@ export class GeminiClient {
       const modelName = this.models[i];
 
       // Use streamGenerateContent for streaming
-      const url = `${this.baseUrl}/publishers/google/models/${modelName}:streamGenerateContent?key=${encodeURIComponent(this.apiKey)}&alt=sse`;
+      const url = `${this.baseUrl}/models/${modelName}:streamGenerateContent?key=${encodeURIComponent(this.apiKey)}&alt=sse`;
 
       try {
         this.logger?.info?.('gemini_stream_starting', { model: modelName });
@@ -206,6 +213,7 @@ export class GeminiClient {
         this.logger?.info?.('gemini_stream_connected', { model: modelName });
 
         let fullContent = '';
+        let fullThinking = '';
         let toolCalls = [];
         let chunkCount = 0;
         
@@ -216,6 +224,7 @@ export class GeminiClient {
           const streamTimeout = setTimeout(() => {
             this.logger?.warn?.('gemini_stream_timeout', { chunkCount, contentLength: fullContent.length });
             resolve({
+              thinking: fullThinking.trim() || null,
               content: fullContent.trim() || null,
               toolCalls
             });
@@ -239,11 +248,19 @@ export class GeminiClient {
                 const parts = data.candidates?.[0]?.content?.parts || [];
                 
                 for (const part of parts) {
-                  if (part.text) {
+                  if (part.text && part.thought === true) {
+                    // This is thinking/reasoning
+                    fullThinking += part.text;
+                    if (onChunk) {
+                      this.logger?.debug?.('gemini_thinking_chunk', { textLength: part.text.length });
+                      onChunk({ type: 'thinking', text: part.text });
+                    }
+                  } else if (part.text) {
+                    // Regular content
                     fullContent += part.text;
                     if (onChunk) {
                       this.logger?.debug?.('gemini_chunk_emit', { textLength: part.text.length });
-                      onChunk(part.text);
+                      onChunk({ type: 'content', text: part.text });
                     }
                   }
                   if (part.functionCall) {
@@ -262,12 +279,14 @@ export class GeminiClient {
           
           response.data.on('end', () => {
             clearTimeout(streamTimeout);
-            this.logger?.info?.('gemini_stream_complete', { 
-              chunkCount, 
+            this.logger?.info?.('gemini_stream_complete', {
+              chunkCount,
               contentLength: fullContent.length,
-              toolCallCount: toolCalls.length 
+              thinkingLength: fullThinking.length,
+              toolCallCount: toolCalls.length
             });
             resolve({
+              thinking: fullThinking.trim() || null,
               content: fullContent.trim() || null,
               toolCalls
             });
@@ -301,7 +320,7 @@ export class GeminiClient {
   async infer({ system, user, mime = 'text/plain' }) {
     for (let i = 0; i < this.models.length; i++) {
       const modelName = this.models[i];
-      const url = `${this.baseUrl}/publishers/google/models/${modelName}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
+      const url = `${this.baseUrl}/models/${modelName}:generateContent?key=${encodeURIComponent(this.apiKey)}`;
 
       try {
         const body = {
@@ -333,16 +352,17 @@ export class GeminiClient {
  * Factory function to create the LLM client
  */
 export function createLLMClient({ logger }) {
-  const apiKey = process.env.GOOGLE_GENAI_API_KEY;
+  // Prefer Google AI Studio key (supports thinking), fall back to Vertex AI key
+  const apiKey = process.env.GOOGLE_AI_STUDIO_KEY || process.env.GOOGLE_GENAI_API_KEY;
 
   if (!apiKey) {
-    throw new Error('GOOGLE_GENAI_API_KEY environment variable required');
+    throw new Error('GOOGLE_AI_STUDIO_KEY or GOOGLE_GENAI_API_KEY environment variable required');
   }
 
-  // Models to try - prioritize full flash for better reasoning
+  // Models to try - Gemini 2.5 Flash is the best available on Vertex AI
   const modelCandidates = process.env.EXPRESS_MODEL
     || process.env.VERTEX_MODEL_CANDIDATES
-    || 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-1.5-pro';
+    || 'gemini-2.5-flash,gemini-2.5-flash-lite,gemini-2.5-pro';
 
   const models = modelCandidates.split(',').map(m => m.trim()).filter(Boolean);
 

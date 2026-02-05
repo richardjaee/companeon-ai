@@ -188,72 +188,120 @@ export class Agent {
 
       try {
         let response;
-        
-        // Try streaming for all responses - gives real-time output
-        // If tool calls appear, we'll retract and continue
-        if (this.llm.chatStream) {
-          this.logger?.info?.('attempting_stream_response', { iteration });
 
+        // Retry wrapper for LLM calls - handles transient Gemini failures
+        const MAX_LLM_RETRIES = 3;
+        let llmRetries = 0;
+
+        // Track if thinking was emitted via streaming (to avoid duplicate emissions)
+        let thinkingAlreadyEmitted = false;
+
+        while (true) {
           try {
-            // Stream chunks in real-time (optimistic - assume final response)
-            let collectedContent = '';
-            let streamStarted = false;
+            // Try streaming for all responses - gives real-time output
+            // If tool calls appear, we'll retract and continue
+            if (this.llm.chatStream) {
+              this.logger?.info?.('attempting_stream_response', { iteration, llmRetry: llmRetries });
 
-            response = await this.llm.chatStream({
-              messages,
-              tools: this.tools.getSchemas(),
-              onChunk: (chunk) => {
-                collectedContent += chunk;
-                // Emit ask_start on first chunk
-                if (!streamStarted) {
-                  emit({ type: 'ask_start' });
-                  streamStarted = true;
+              try {
+                // Stream chunks in real-time (optimistic - assume final response)
+                let collectedContent = '';
+                let streamStarted = false;
+
+                let collectedThinking = '';
+                thinkingAlreadyEmitted = false;
+                response = await this.llm.chatStream({
+                  messages,
+                  tools: this.tools.getSchemas(),
+                  onChunk: (chunk) => {
+                    // Handle new object format with type field
+                    if (typeof chunk === 'object' && chunk.type) {
+                      if (chunk.type === 'thinking') {
+                        collectedThinking += chunk.text;
+                        thinkingAlreadyEmitted = true;
+                        // Emit thinking immediately
+                        emit({ type: 'thinking_delta', text: chunk.text });
+                      } else if (chunk.type === 'content') {
+                        collectedContent += chunk.text;
+                        if (!streamStarted) {
+                          emit({ type: 'ask_start' });
+                          streamStarted = true;
+                        }
+                        emit({ type: 'ask_delta', text: chunk.text });
+                      }
+                    } else {
+                      // Backward compat: plain string chunk
+                      collectedContent += chunk;
+                      if (!streamStarted) {
+                        emit({ type: 'ask_start' });
+                        streamStarted = true;
+                      }
+                      emit({ type: 'ask_delta', text: chunk });
+                    }
+                  }
+                });
+
+                // Check if this was actually the final response
+                if (!response.toolCalls || response.toolCalls.length === 0) {
+                  // FINAL RESPONSE - emit the complete message
+                  finalResponse = response.content || collectedContent;
+                  emit({ type: 'ask', message: finalResponse });
+                } else {
+                  // HAS TOOL CALLS - we streamed prematurely, tell frontend to discard
+                  if (streamStarted) {
+                    emit({ type: 'ask_retract' });
+                    this.logger?.info?.('retracted_premature_stream', { length: collectedContent.length });
+                  }
+
+                  // Thinking was already emitted via streaming chunks (line 218)
+                  // Only emit response.thinking if we didn't get it during streaming
+                  if (response.thinking?.trim() && !collectedThinking.trim()) {
+                    emit({ type: 'thinking_delta', text: response.thinking.trim() });
+                  }
+
+                  // Emit collected content as thinking only if not already streamed as content
+                  if (collectedContent.trim() && !streamStarted) {
+                    emit({ type: 'thinking_delta', text: collectedContent.trim() });
+                  }
+
+                  this.logger?.info?.('stream_produced_tool_calls', { count: response.toolCalls.length, hasThinking: !!response.thinking });
                 }
-                // Emit chunk immediately for real-time streaming
-                emit({ type: 'ask_delta', text: chunk });
+
+              } catch (streamErr) {
+                this.logger?.warn?.('stream_fallback_to_regular', { error: streamErr.message });
+                // Fall back to regular non-streaming call
+                response = await this.llm.chat({
+                  messages,
+                  tools: this.tools.getSchemas(),
+                  toolChoice: 'auto'
+                });
               }
-            });
-
-            // Check if this was actually the final response
-            if (!response.toolCalls || response.toolCalls.length === 0) {
-              // FINAL RESPONSE - emit the complete message
-              finalResponse = response.content || collectedContent;
-              emit({ type: 'ask', message: finalResponse });
-              break;
+            } else {
+              // Regular non-streaming call (first iteration or streaming not available)
+              response = await this.llm.chat({
+                messages,
+                tools: this.tools.getSchemas(),
+                toolChoice: 'auto'
+              });
             }
 
-            // HAS TOOL CALLS - we streamed prematurely, tell frontend to discard
-            // Emit a retract event so frontend knows this wasn't the final response
-            if (streamStarted) {
-              emit({ type: 'ask_retract' });
-              this.logger?.info?.('retracted_premature_stream', { length: collectedContent.length });
-            }
+            // LLM call succeeded, break out of retry loop
+            break;
 
-            // Also emit as thinking for context
-            if (collectedContent.trim()) {
-              emit({ type: 'thinking_delta', text: collectedContent.trim() });
+          } catch (llmError) {
+            llmRetries++;
+            if (llmRetries >= MAX_LLM_RETRIES) {
+              this.logger?.error?.('llm_retries_exhausted', { retries: llmRetries, error: llmError.message });
+              throw llmError;
             }
-
-            this.logger?.info?.('stream_produced_tool_calls', { count: response.toolCalls.length });
-            // Fall through to tool handling below
-            
-          } catch (streamErr) {
-            this.logger?.warn?.('stream_fallback_to_regular', { error: streamErr.message });
-            // Fall back to regular non-streaming call
-            response = await this.llm.chat({
-              messages,
-              tools: this.tools.getSchemas(),
-              toolChoice: 'auto'
-            });
+            const delay = llmRetries * 2000;
+            this.logger?.warn?.('llm_retry', { retry: llmRetries, maxRetries: MAX_LLM_RETRIES, delayMs: delay, error: llmError.message });
+            await new Promise(r => setTimeout(r, delay));
           }
-        } else {
-          // Regular non-streaming call (first iteration or streaming not available)
-          response = await this.llm.chat({
-            messages,
-            tools: this.tools.getSchemas(),
-            toolChoice: 'auto'
-          });
         }
+
+        // If finalResponse was set inside the streaming block, we already broke out of the iteration loop
+        if (finalResponse) break;
         
         justProcessedTools = false; // Reset flag
 
@@ -267,10 +315,23 @@ export class Agent {
           // This avoids the issue of "thinking" text mixing with responses
           // (Cursor, Claude Code, etc. do it this way)
           
-          // Still add any LLM content to messages for context (but don't emit)
-          const contentText = response.content?.trim();
-          if (contentText) {
-            messages.push({ role: 'assistant', content: contentText });
+          // Emit thinking from Gemini's thinking mode (only if not already emitted via streaming)
+          if (!thinkingAlreadyEmitted) {
+            const thinkingText = response.thinking?.trim();
+            if (thinkingText) {
+              emit({ type: 'thinking_delta', text: thinkingText });
+              thinkingAlreadyEmitted = true;
+            }
+
+            // Emit any additional reasoning text alongside tool calls
+            const contentText = response.content?.trim();
+            if (contentText) {
+              messages.push({ role: 'assistant', content: contentText });
+              emit({ type: 'thinking_delta', text: contentText });
+            }
+          } else if (response.content?.trim()) {
+            // Still need to add content to messages for context
+            messages.push({ role: 'assistant', content: response.content.trim() });
           }
 
           for (const toolCall of response.toolCalls) {
