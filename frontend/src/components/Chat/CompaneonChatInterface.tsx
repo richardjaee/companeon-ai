@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PaperAirplaneIcon, XMarkIcon, Cog6ToothIcon, ClockIcon, PlusIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -64,7 +64,7 @@ interface ChatMessage {
     isActive: boolean;
     txHashes?: Record<number, string>; // Map tool index to txHash
     thinkingText?: string; // Accumulated thinking_delta text
-    toolStates?: Record<string, { status: 'running' | 'completed' | 'error', progress?: string[] }>; // Track tool states and progress
+    toolStates?: Record<string, { status: 'running' | 'completed' | 'error', progress?: string[], thinkingBefore?: string }>; // Track tool states and progress
   };
   simplified_view?: {
     total_value: string;
@@ -91,6 +91,122 @@ interface ChatMessage {
   };
   requiresConfirmation?: boolean; // Whether this message requires user confirmation (backend-controlled)
   confirmationQuestion?: string; // Optional specific question to show
+}
+
+// Component for thinking content with auto-scroll
+function ThinkingContent({
+  toolEntries,
+  thinkingText,
+  isActive
+}: {
+  toolEntries: [string, { status: 'running' | 'completed' | 'error', progress?: string[], thinkingBefore?: string }][];
+  thinkingText?: string;
+  isActive: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // MutationObserver watches actual DOM changes - more reliable than React state deps
+  useEffect(() => {
+    if (!containerRef.current || !isActive) return;
+
+    const container = containerRef.current;
+    let lastScrollHeight = container.scrollHeight;
+
+    const scrollToBottom = () => {
+      // Only scroll if content actually grew (prevents bouncing on minor changes)
+      if (container.scrollHeight > lastScrollHeight) {
+        container.scrollTop = container.scrollHeight;
+        lastScrollHeight = container.scrollHeight;
+      }
+    };
+
+    // Initial scroll
+    container.scrollTop = container.scrollHeight;
+    lastScrollHeight = container.scrollHeight;
+
+    // Watch for any DOM changes inside the container
+    const observer = new MutationObserver(scrollToBottom);
+    observer.observe(container, { childList: true, subtree: true, characterData: true });
+
+    return () => observer.disconnect();
+  }, [isActive]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="mt-1 ml-2 space-y-2 max-w-[80%] max-h-[300px] overflow-y-auto pr-2 thinking-scroll-container"
+    >
+      {toolEntries.map(([toolKey, toolState]) => {
+        const isRunning = toolState.status === 'running';
+        const isCompleted = toolState.status === 'completed';
+        const isError = toolState.status === 'error';
+        const hasProgress = toolState.progress && toolState.progress.length > 0;
+        const toolName = toolKey.replace(/_\d+$/, '');
+
+        return (
+          <div key={toolKey} className="space-y-1">
+            {toolState.thinkingBefore && (
+              <div className="text-xs text-gray-500 leading-relaxed">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm, remarkBreaks]}
+                  components={{
+                    p: ({children}) => <p className="mb-2">{children}</p>,
+                    strong: ({children}) => <strong className="font-semibold text-gray-700 block mb-0.5">{children}</strong>,
+                  }}
+                >
+                  {toolState.thinkingBefore}
+                </ReactMarkdown>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 text-xs text-gray-500">
+              {isCompleted ? (
+                <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                </svg>
+              ) : isError ? (
+                <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                </svg>
+              ) : isRunning ? (
+                <svg className="w-4 h-4 text-gray-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <div className="w-4 h-4 flex-shrink-0"></div>
+              )}
+              <span className="font-medium">{toolName}</span>
+            </div>
+
+            {hasProgress && (
+              <div className="ml-6 space-y-0.5">
+                {toolState.progress!.map((progressMsg, progressIdx) => (
+                  <div key={progressIdx} className="text-xs text-gray-400 italic">
+                    {progressMsg}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {thinkingText && (
+        <div className="text-xs text-gray-500 leading-relaxed">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkBreaks]}
+            components={{
+              p: ({children}) => <p className="mb-2">{children}</p>,
+              strong: ({children}) => <strong className="font-semibold text-gray-700 block mb-0.5">{children}</strong>,
+            }}
+          >
+            {thinkingText}
+          </ReactMarkdown>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface CompaneonChatInterfaceProps {
@@ -916,7 +1032,7 @@ export default function CompaneonChatInterface({
         timestamp: new Date().toISOString(),
         thinking: {
           messages: [] as string[], // Will be populated by tool_call events
-          isExpanded: true, // Auto-expand to show tools
+          isExpanded: true, // Expanded by default to show thinking
           isActive: true
         }
       };
@@ -976,6 +1092,7 @@ export default function CompaneonChatInterface({
       let currentThinkingMessages: string[] = [];
       let streamingMessageContent = ''; // For accumulating ask_delta events
       let streamingThinkingContent = ''; // For accumulating plan_delta events
+      let pendingThinkingText = ''; // Buffer for thinking_delta text to attach to next tool_call
 
       let turnComplete = false;
       let receivedAsk = false;
@@ -1115,21 +1232,22 @@ export default function CompaneonChatInterface({
 
               // Just show "Thinking..." indicator, no text content
             } else if (event.type === 'thinking_delta') {
-              // Agent's thinking process - show below current tool
-              
+              // Agent's reasoning process - buffer to attach to next tool_call
+
+              pendingThinkingText += (event.text || '');
+
+              // Show live in the thinking area and auto-expand to show streaming
               setMessages(prev => {
                 const newMessages = [...prev];
                 const lastUserMessageIndex = [...newMessages].reverse().findIndex(msg => msg.type === 'user');
                 if (lastUserMessageIndex !== -1) {
                   const actualIndex = newMessages.length - 1 - lastUserMessageIndex;
                   if (newMessages[actualIndex].thinking) {
-                    // Append to existing thinking text
-                    const currentText = newMessages[actualIndex].thinking!.thinkingText || '';
                     newMessages[actualIndex] = {
                       ...newMessages[actualIndex],
                       thinking: {
                         ...newMessages[actualIndex].thinking!,
-                        thinkingText: currentText + (event.text || '')
+                        thinkingText: pendingThinkingText
                       }
                     };
                   }
@@ -1156,7 +1274,7 @@ export default function CompaneonChatInterface({
                         ...newMessages[actualIndex],
                         thinking: {
                           messages: [event.text],
-                          isExpanded: false,
+                          isExpanded: true,
                           isActive: true
                         }
                       };
@@ -1234,8 +1352,15 @@ export default function CompaneonChatInterface({
               toolCallCounter++;
               const uniqueToolKey = `${toolName}_${toolCallCounter}`;
 
-              // Initialize tool state as running
-              const toolStates = { [uniqueToolKey]: { status: 'running' as const, progress: [] as string[] } };
+              // Initialize tool state as running, attach any buffered thinking text
+              const capturedThinking = pendingThinkingText.trim();
+              pendingThinkingText = ''; // Clear buffer
+
+              const toolStates = { [uniqueToolKey]: {
+                status: 'running' as const,
+                progress: [] as string[],
+                thinkingBefore: capturedThinking || undefined
+              } };
 
               // Update thinking section with tool state
               setMessages(prev => {
@@ -1250,7 +1375,7 @@ export default function CompaneonChatInterface({
                       thinking: {
                         ...newMessages[actualIndex].thinking!,
                         toolStates: { ...existingToolStates, ...toolStates },
-                        thinkingText: '' // Clear thinking text for new tool
+                        thinkingText: '' // Clear live thinking text now that it's attached to tool
                       }
                     };
                   }
@@ -1291,8 +1416,8 @@ export default function CompaneonChatInterface({
                         ...newMessages[actualIndex],
                         thinking: {
                           ...newMessages[actualIndex].thinking!,
-                          toolStates,
-                          isActive: false  // Stop the blinking cursor when tools complete
+                          toolStates
+                          // Don't set isActive: false here - more tools may be coming
                         }
                       };
                     }
@@ -1369,8 +1494,8 @@ export default function CompaneonChatInterface({
                         ...newMessages[actualIndex],
                         thinking: {
                           ...newMessages[actualIndex].thinking!,
-                          toolStates,
-                          isActive: false  // Stop the blinking cursor when tools error
+                          toolStates
+                          // Don't set isActive: false here - more tools may be coming
                         }
                       };
                     }
@@ -1585,6 +1710,7 @@ export default function CompaneonChatInterface({
               });
 
               streamingMessageContent = ''; // Reset for next message
+              pendingThinkingText = ''; // Reset thinking buffer
               currentCitations = []; // Reset citations for next message
               currentImageData = null; // Reset image data for next message
               currentTxHashes = []; // Reset txHashes for next message
@@ -1691,6 +1817,7 @@ export default function CompaneonChatInterface({
               // Reset streaming state for next message
               streamingMessageContent = '';
               streamingThinkingContent = '';
+              pendingThinkingText = '';
               currentAssistantMessage = '';
               // DON'T clear currentThinkingMessages - buffered events might still reference it
               setIsTyping(false);
@@ -2579,99 +2706,63 @@ export default function CompaneonChatInterface({
               </div>
             </div>
             
-            {/* Simple inline thinking display */}
+            {/* Thinking display - collapsed shows tools only, expanded shows full thinking */}
             {msg.type === 'user' && msg.thinking && (
               <div className="mb-2 ml-12">
-                <button
-                  onClick={() => {
-                    setMessages(prev => {
-                      const updatedMessages = [...prev];
-                      if (updatedMessages[index].thinking) {
-                        updatedMessages[index] = {
-                          ...updatedMessages[index],
-                          thinking: {
-                            ...updatedMessages[index].thinking!,
-                            isExpanded: !updatedMessages[index].thinking!.isExpanded
-                          }
-                        };
-                      }
-                      return updatedMessages;
-                    });
-                  }}
-                  className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 group"
-                >
-                  {msg.thinking.isActive && (
-                    <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
-                  )}
-                  <span>Thinking...</span>
-                  <svg
-                    className={`w-3 h-3 transition-transform ${msg.thinking.isExpanded ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+                {(() => {
+                  const toolCount = msg.thinking.toolStates ? Object.keys(msg.thinking.toolStates).length : 0;
+                  const toolEntries = msg.thinking.toolStates ? Object.entries(msg.thinking.toolStates) : [];
 
+                  return (
+                    <>
+                      {/* Header button */}
+                      <button
+                        onClick={() => {
+                          setMessages(prev => {
+                            const updatedMessages = [...prev];
+                            if (updatedMessages[index].thinking) {
+                              updatedMessages[index] = {
+                                ...updatedMessages[index],
+                                thinking: {
+                                  ...updatedMessages[index].thinking!,
+                                  isExpanded: !updatedMessages[index].thinking!.isExpanded
+                                }
+                              };
+                            }
+                            return updatedMessages;
+                          });
+                        }}
+                        className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1.5 group"
+                      >
+                        {msg.thinking.isActive && (
+                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></div>
+                        )}
+                        <span>
+                          {msg.thinking.isActive
+                            ? 'Thinking...'
+                            : `Thought${toolCount > 0 ? ` (${toolCount} tool${toolCount !== 1 ? 's' : ''})` : ''}`}
+                        </span>
+                        <svg
+                          className={`w-3 h-3 transition-transform ${msg.thinking.isExpanded ? 'rotate-180' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
 
-                {msg.thinking.isExpanded && msg.thinking.toolStates && Object.keys(msg.thinking.toolStates).length > 0 && (
-                  <div className="mt-1 ml-2 space-y-2 max-w-[80%]">
-                    {/* Render each tool with its state and progress messages */}
-                    {Object.entries(msg.thinking.toolStates).map(([toolKey, toolState]) => {
-                      const isRunning = toolState.status === 'running';
-                      const isCompleted = toolState.status === 'completed';
-                      const isError = toolState.status === 'error';
-                      const hasProgress = toolState.progress && toolState.progress.length > 0;
-
-                      // Extract clean tool name by removing _N suffix
-                      const toolName = toolKey.replace(/_\d+$/, '');
-
-                      return (
-                        <div key={toolKey} className="space-y-1">
-                          {/* Tool header with status icon */}
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            {isCompleted ? (
-                              <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                              </svg>
-                            ) : isError ? (
-                              <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
-                              </svg>
-                            ) : isRunning ? (
-                              <svg className="w-4 h-4 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                            ) : (
-                              <div className="w-4 h-4"></div>
-                            )}
-                            <span>Tool: {toolName}</span>
-                          </div>
-
-                          {/* Progress messages indented under the tool */}
-                          {hasProgress && (
-                            <div className="ml-6 space-y-0.5">
-                              {toolState.progress!.map((progressMsg, progressIdx) => (
-                                <div key={progressIdx} className="text-xs text-gray-400 italic">
-                                  {progressMsg}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Show thinking text below tools */}
-                    {msg.thinking.thinkingText && (
-                      <div className="mt-1 ml-5 text-xs text-gray-600 italic whitespace-pre-line">
-                        {msg.thinking.thinkingText}
-                      </div>
-                    )}
-                  </div>
-                )}
+                      {/* Thinking content */}
+                      {(msg.thinking.thinkingText || toolEntries.length > 0) && (
+                        <ThinkingContent
+                          toolEntries={toolEntries}
+                          thinkingText={msg.thinking.thinkingText}
+                          isActive={msg.thinking.isActive}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             )}
             

@@ -263,3 +263,52 @@
   transform: translateY(-50%);
   cursor: pointer;
 }
+
+/* Thinking markdown styles - clean, even spacing */
+.thinking-markdown p {
+  @apply mb-2 leading-relaxed;
+}
+
+.thinking-markdown p:last-child {
+  @apply mb-0;
+}
+
+.thinking-markdown strong {
+  @apply font-semibold text-gray-700;
+}
+
+.thinking-markdown code {
+  @apply bg-gray-100 px-1 py-0.5 rounded text-[11px] font-mono;
+}
+
+.thinking-markdown ul,
+.thinking-markdown ol {
+  @apply ml-4 mb-2;
+}
+
+.thinking-markdown li {
+  @apply mb-1;
+}
+
+/* Thinking scroll container - subtle scrollbar */
+.thinking-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+.thinking-scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.thinking-scroll-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thinking-scroll-container::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.4);
+  border-radius: 2px;
+}
+
+.thinking-scroll-container::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.6);
+}
