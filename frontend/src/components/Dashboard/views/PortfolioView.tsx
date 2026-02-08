@@ -304,20 +304,19 @@ export default function PortfolioView() {
     }
   }, [address, isConnected]);
 
-  // Handler for when permissions are successfully granted - refresh limits then close
+  // Handler for when permissions are successfully granted - close immediately, refresh in background
   const handleAgentPermissionsComplete = useCallback(async () => {
-    
-    try {
-      // Small delay to allow backend to process the new permissions
-      
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      await fetchWalletLimits();
-      
-    } catch (error) {
-      
-    }
+    // Close immediately for better UX
     setIsAgentPermissionsClosing(true);
+
+    // Refresh limits in background after backend has time to process
+    setTimeout(async () => {
+      try {
+        await fetchWalletLimits();
+      } catch (error) {
+        // Silently handle - user can manually refresh if needed
+      }
+    }, 1500);
   }, [fetchWalletLimits]);
 
   // Listen for transaction completion and refresh balances
@@ -932,6 +931,7 @@ export default function PortfolioView() {
                 walletLimits={walletLimits}
                 fetchWalletLimits={fetchWalletLimits}
                 isConnected={isConnected}
+                isLoading={isLoadingLimits}
               />
 
               {/* Your Crypto Header */}

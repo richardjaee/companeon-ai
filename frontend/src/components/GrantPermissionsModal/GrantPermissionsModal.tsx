@@ -11,6 +11,7 @@ import { XMarkIcon as XIcon } from '@heroicons/react/24/outline';
 import { SmartAccountPermission, AgentAsset } from '@/lib/smartAccount/types';
 import { createSmartAccount, detectSmartAccountImplementation } from '@/lib/smartAccount/router';
 import { isMetaMaskFlask } from '@/lib/smartAccount/detectFlask';
+import { switchToChain, CHAIN_PARAMS } from '@/lib/smartAccount/chains';
 
 interface GrantPermissionsModalProps {
   isOpen: boolean;
@@ -136,49 +137,15 @@ export default function GrantPermissionsModal({
       setError(null);
       setSteps(prev => prev.map((s, i) => i === 0 ? { ...s, status: 'loading' } : s));
 
-      // Switch to Sepolia before capability detection
-      setCurrentStage('Switching to Sepolia...');
-      const currentChainId = await effectiveEthereum.request({ method: 'eth_chainId' });
-      const currentChainNumber = parseInt(currentChainId, 16);
+      // Switch to the target chain before capability detection
+      const chainParams = CHAIN_PARAMS[config.chainId];
+      setCurrentStage(`Switching to ${chainParams?.name || config.name}...`);
+      await switchToChain(effectiveEthereum, config.chainId);
 
-      if (currentChainNumber !== 11155111) {
-        
-        try {
-          await effectiveEthereum.request({
-            method: 'wallet_switchEthereumChain',
-            params: [{ chainId: '0xaa36a7' }], // Sepolia
-          });
-          
-        } catch (switchError: any) {
-          if (switchError.code === 4902) {
-            await effectiveEthereum.request({
-              method: 'wallet_addEthereumChain',
-              params: [{
-                chainId: '0xaa36a7',
-                chainName: 'Sepolia',
-                nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-                rpcUrls: ['https://rpc.sepolia.org'],
-                blockExplorerUrls: ['https://sepolia.etherscan.io']
-              }],
-            });
-          } else if (switchError.code === 4001) {
-            throw new Error('Please switch to Sepolia testnet to use ERC-7715 permissions');
-          } else {
-            throw new Error('Please switch to Sepolia testnet to use ERC-7715 permissions');
-          }
-        }
-      }
-
-      // Check if MetaMask Flask is being used (after switching to Sepolia)
+      // Check if MetaMask Flask is being used (after switching chain)
       // Note: Flask detection can be unreliable, so we just log and proceed
       // The actual requestExecutionPermissions call will confirm if Flask works
       const hasFlask = await isMetaMaskFlask(effectiveEthereum);
-      if (!hasFlask) {
-        
-        
-      } else {
-        
-      }
 
       setCurrentStage('');
 
@@ -226,7 +193,8 @@ export default function GrantPermissionsModal({
         effectiveEthereum,
         effectiveAddress,
         validPermissions,
-        backendDelegationAddress // Backend can execute trades within ERC-7715 limits
+        backendDelegationAddress, // Backend can execute trades within ERC-7715 limits
+        config.chainId
       );
 
       // Log the NEW permission contexts from MetaMask (for debugging stale context issues)
@@ -399,7 +367,7 @@ export default function GrantPermissionsModal({
         permissionsContext: permContext, // Primary context (backward compat)
         allPermissionContexts: allContexts, // All contexts keyed by token address ('native' for ETH)
         delegationManager: delegManager,
-        chainId: 11155111, // Sepolia
+        chainId: config.chainId,
         expiresAt: expiresAt,
         smartAccountAddress: smartAccount,
         scopes: scopes
@@ -514,7 +482,7 @@ export default function GrantPermissionsModal({
                   zkProofStage={undefined}
                   isTransactionSubmitted={false}
                   signatureExpiry={null}
-                  getEtherscanLink={(tx) => `https://basescan.org/tx/${tx}`}
+                  getEtherscanLink={(tx) => `${config.blockExplorer}/tx/${tx}`}
                   keyManagementType="Self custody"
                   kmsCommitment={null}
                   commitmentMatched={null}
