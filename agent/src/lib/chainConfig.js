@@ -92,6 +92,7 @@ const CHAINS = {
     // x402 is chain-agnostic! Works on Ethereum mainnet via eip155:1
     x402Supported: true,
     x402Network: 'eip155:1', // EIP-155 chain ID format for x402
+    erc7715Supported: true,
   },
 
   // Base Mainnet
@@ -140,6 +141,7 @@ const CHAINS = {
     rpcDefault: 'https://mainnet.base.org',
     x402Supported: true,
     x402Network: 'eip155:8453', // EIP-155 chain ID format for x402
+    erc7715Supported: true,
   }
 };
 

@@ -4,9 +4,9 @@
 
 import { SmartAccountPermission, CreateSmartAccountResult } from './types';
 import { createWalletClient, custom, type Address, parseUnits } from 'viem';
-import { sepolia } from 'viem/chains';
 import { erc7715ProviderActions } from '@metamask/smart-accounts-kit/actions';
 import { getFlaskRequirementMessage } from './detectFlask';
+import { getViemChain, switchToChain } from './chains';
 
 /**
  * Creates a smart account and grants permissions using MetaMask Smart Accounts Kit
@@ -31,7 +31,8 @@ export async function createSmartAccountWithPermissions(
   ethereum: any,
   ownerAddress: string,
   permissions: SmartAccountPermission[],
-  delegateAddress: string
+  delegateAddress: string,
+  chainId: number = 8453
 ): Promise<CreateSmartAccountResult> {
   if (!ethereum) {
     throw new Error('MetaMask not found');
@@ -43,42 +44,14 @@ export async function createSmartAccountWithPermissions(
 
   try {
     
-    // Step 1: Switch to Sepolia FIRST before any other operations
+    // Step 1: Switch to target chain FIRST before any other operations
     // This is critical because wallet_getCapabilities and other RPC calls
     // may behave differently on different chains
-    const currentChainId = await ethereum.request({ method: 'eth_chainId' });
-    const currentChainNumber = parseInt(currentChainId, 16);
+    await switchToChain(ethereum, chainId);
 
-    if (currentChainNumber !== 11155111) {
-      
-      try {
-        await ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: '0xaa36a7' }], // Sepolia
-        });
-        
-      } catch (switchError: any) {
-        if (switchError.code === 4902) {
-          await ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: '0xaa36a7',
-              chainName: 'Sepolia',
-              nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-              rpcUrls: ['https://rpc.sepolia.org'],
-              blockExplorerUrls: ['https://sepolia.etherscan.io']
-            }],
-          });
-        } else {
-          throw new Error('Please switch to Sepolia testnet to use ERC-7715 permissions');
-        }
-      }
-    }
-
-    // Step 2: Create wallet client with ERC-7715 actions using viem's official sepolia chain
-    // This matches the working test page implementation
+    // Step 2: Create wallet client with ERC-7715 actions
     const walletClient = createWalletClient({
-      chain: sepolia,
+      chain: getViemChain(chainId),
       transport: custom(ethereum),
     }).extend(erc7715ProviderActions());
 
@@ -112,7 +85,7 @@ export async function createSmartAccountWithPermissions(
       const defaultNativeAmount = parseUnits('0.1', 18);
       
       erc7715Permissions.push({
-        chainId: 11155111, // Sepolia only for ERC-7715
+        chainId,
         expiry: defaultExpiry,
         signer: {
           type: 'account' as const,
@@ -171,7 +144,7 @@ export async function createSmartAccountWithPermissions(
       if (isNativeToken) {
         // Native token (ETH) periodic permission
         erc7715Permissions.push({
-          chainId: 11155111, // Sepolia only for ERC-7715
+          chainId,
           expiry,
           signer: {
             type: 'account' as const,
@@ -190,7 +163,7 @@ export async function createSmartAccountWithPermissions(
       } else {
         // ERC-20 token periodic permission
         erc7715Permissions.push({
-          chainId: 11155111, // Sepolia only for ERC-7715
+          chainId,
           expiry,
           signer: {
             type: 'account' as const,

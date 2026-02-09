@@ -73,16 +73,24 @@ async function getViemChainObject(chainId) {
       return chains.sepolia;
     case 8453:
       return chains.base;
+    case 1:
+      return chains.mainnet;
     default:
-      return chains.sepolia;
+      return chains.base;
   }
 }
 
 function getRpcUrl(chainId) {
-  if (chainId === 8453) {
-    return process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+  switch (chainId) {
+    case 8453:
+      return process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+    case 1:
+      return process.env.ETH_RPC_URL || 'https://rpc.ankr.com/eth';
+    case 11155111:
+      return process.env.RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
+    default:
+      return process.env.BASE_RPC_URL || 'https://mainnet.base.org';
   }
-  return process.env.RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
 }
 
 async function getCaveatEnforcerClient(chainId) {
@@ -393,7 +401,7 @@ app.post('/wallet/register-agent', async (req, res) => {
       permissionsContext,
       allPermissionContexts,
       delegationManager,
-      chainId = 11155111,
+      chainId = 8453,
       expiresAt,
       smartAccountAddress,
       accountMeta,
@@ -515,7 +523,7 @@ app.get('/wallet/status', async (req, res) => {
 app.get('/wallet/limits', async (req, res) => {
   try {
     const walletAddress = req.query.wallet || req.query.walletAddress;
-    const chainId = parseInt(req.query.chainId) || 11155111;
+    const chainId = parseInt(req.query.chainId) || 8453;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'wallet query param required' });

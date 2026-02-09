@@ -2,8 +2,8 @@ import { apiClient } from '@/lib/api/apiClient';
 import { detectSmartAccountImplementation } from '@/lib/smartAccount/router';
 import { isMetaMaskFlask } from '@/lib/smartAccount/detectFlask';
 import { createWalletClient, custom, parseUnits, type Address } from 'viem';
-import { sepolia } from 'viem/chains';
 import { erc7715ProviderActions } from '@metamask/smart-accounts-kit/actions';
+import { getViemChain, switchToChain } from './chains';
 
 export interface PermissionScope {
   type: 'nativeTokenPeriodTransfer' | 'erc20PeriodTransfer';
@@ -31,41 +31,7 @@ export interface GrantPermissionsResult {
   delegationManager: string | null;
 }
 
-/**
- * Switch wallet to Sepolia network (required for ERC-7715)
- */
-async function switchToSepolia(ethereum: any): Promise<void> {
-  const currentChainId = await ethereum.request({ method: 'eth_chainId' });
-  const currentChainNumber = parseInt(currentChainId, 16);
-
-  if (currentChainNumber !== 11155111) {
-    
-    try {
-      await ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0xaa36a7' }], // Sepolia
-      });
-      
-    } catch (switchError: any) {
-      if (switchError.code === 4902) {
-        await ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [{
-            chainId: '0xaa36a7',
-            chainName: 'Sepolia',
-            nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-            rpcUrls: ['https://rpc.sepolia.org'],
-            blockExplorerUrls: ['https://sepolia.etherscan.io']
-          }],
-        });
-      } else if (switchError.code === 4001) {
-        throw new Error('Please switch to Sepolia testnet to use ERC-7715 permissions');
-      } else {
-        throw new Error('Please switch to Sepolia testnet to use ERC-7715 permissions');
-      }
-    }
-  }
-}
+// Chain switching is handled by switchToChain() from ./chains
 
 /**
  * Convert PermissionScope to ERC-7715 format and grant permissions
@@ -73,10 +39,11 @@ async function switchToSepolia(ethereum: any): Promise<void> {
 export async function grantERC7715Permissions(
   ethereum: any,
   walletAddress: string,
-  scopes: PermissionScope[]
+  scopes: PermissionScope[],
+  chainId: number = 8453
 ): Promise<GrantPermissionsResult> {
-  // Step 1: Switch to Sepolia
-  await switchToSepolia(ethereum);
+  // Step 1: Switch to the target chain
+  await switchToChain(ethereum, chainId);
 
   // Step 2: Check Flask
   const hasFlask = await isMetaMaskFlask(ethereum);
@@ -94,7 +61,7 @@ export async function grantERC7715Permissions(
 
   // Step 4: Create wallet client with ERC-7715 actions (using MetaMask Smart Accounts Kit)
   const walletClient = createWalletClient({
-    chain: sepolia,
+    chain: getViemChain(chainId),
     transport: custom(ethereum),
   }).extend(erc7715ProviderActions());
 
@@ -111,7 +78,7 @@ export async function grantERC7715Permissions(
 
       
       erc7715Permissions.push({
-        chainId: 11155111, // Sepolia
+        chainId,
         expiry,
         signer: {
           type: 'account' as const,
@@ -133,7 +100,7 @@ export async function grantERC7715Permissions(
 
       
       erc7715Permissions.push({
-        chainId: 11155111, // Sepolia
+        chainId,
         expiry,
         signer: {
           type: 'account' as const,
@@ -202,7 +169,8 @@ export async function registerWalletAgent(
   permissionsContext: string,
   delegationManager: string | null,
   expiresAt: number,
-  scopes: PermissionScope[]
+  scopes: PermissionScope[],
+  chainId: number = 8453
 ): Promise<void> {
   const backendDelegationAddress = process.env.NEXT_PUBLIC_BACKEND_DELEGATION_ADDRESS;
 
@@ -211,7 +179,7 @@ export async function registerWalletAgent(
     backendDelegationAddress,
     permissionsContext,
     delegationManager,
-    chainId: 11155111, // Sepolia
+    chainId,
     expiresAt,
     smartAccountAddress,
     accountMeta: undefined,

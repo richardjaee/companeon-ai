@@ -43,9 +43,9 @@ export async function detectSmartAccountImplementation(
 
 /**
  * Create smart account using ERC-7715 (Flask required)
- * 
- * This function ONLY grants ERC-7715 permissions (on Sepolia).
-  * 
+ *
+ * This function grants ERC-7715 permissions on the specified chain.
+ *
  * Used by: GrantPermissionsModal for wallet agent permissions
  */
 export async function createSmartAccount(
@@ -53,18 +53,19 @@ export async function createSmartAccount(
   ownerAddress: string,
   permissions: SmartAccountPermission[],
   delegateAddress: string,
-  agentType?: string
+  chainId: number = 8453
 ): Promise<CreateSmartAccountResult & { implementation: SmartAccountImplementation }> {
   const detection = await detectSmartAccountImplementation(ethereum);
 
-  
-  
-  // Create ERC-7715 smart account with permissions (on Sepolia)
+
+
+  // Create ERC-7715 smart account with permissions on target chain
   const smartAccountResult = await createSmartAccountWithPermissions(
     ethereum,
     ownerAddress,
     permissions,
-    delegateAddress
+    delegateAddress,
+    chainId
   );
 
   
@@ -79,6 +80,6 @@ export async function createSmartAccount(
  * Create smart account with NFT agent (ERC-7715 + NFT)
  * 
  * This helper is no longer used in the wallet-only flow.
- * Note: ERC-7715 runs on Sepolia.
+ * Note: ERC-7715 runs on the target chain (Base, Ethereum, Sepolia).
  */
 // Removed createSmartAccountWithAgent and NFT agent creation

@@ -9,6 +9,7 @@ interface YourPermissionsProps {
   walletLimits: any[];
   fetchWalletLimits: () => Promise<void>;
   isConnected: boolean;
+  isLoading?: boolean;
 }
 
 // Helper to get token name from symbol
@@ -33,6 +34,7 @@ export default function YourPermissions({
   walletLimits,
   fetchWalletLimits,
   isConnected,
+  isLoading = false,
 }: YourPermissionsProps) {
   const [flashingLimits, setFlashingLimits] = useState<Record<string, 'decrease' | 'increase'>>({});
   const previousLimitsRef = useRef<Record<string, string>>({});
@@ -386,6 +388,36 @@ export default function YourPermissions({
                 </div>
               );
             })
+          ) : isLoading ? (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden animate-pulse">
+              <div className="flex flex-wrap items-center gap-4 lg:gap-6">
+                <div className="flex items-center gap-3 min-w-[120px]">
+                  <div className="w-8 h-8 rounded-full bg-gray-200" />
+                  <div className="flex flex-col gap-1">
+                    <div className="h-4 w-12 bg-gray-200 rounded" />
+                    <div className="h-3 w-16 bg-gray-200 rounded" />
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-4 lg:gap-6 flex-1">
+                  <div className="flex flex-col gap-1">
+                    <div className="h-3 w-14 bg-gray-200 rounded" />
+                    <div className="h-4 w-16 bg-gray-200 rounded" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="h-3 w-14 bg-gray-200 rounded" />
+                    <div className="h-4 w-12 bg-gray-200 rounded" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="h-3 w-14 bg-gray-200 rounded" />
+                    <div className="h-4 w-10 bg-gray-200 rounded" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <div className="h-3 w-12 bg-gray-200 rounded" />
+                    <div className="h-4 w-24 bg-gray-200 rounded" />
+                  </div>
+                </div>
+              </div>
+            </div>
           ) : (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 overflow-hidden">
               <div className="flex flex-wrap items-center gap-4 lg:gap-6">
