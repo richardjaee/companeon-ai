@@ -15,6 +15,7 @@ import Image from 'next/image';
 // Removed execution step components
 import { companeonApi } from '@/lib/api/companeon';
 import { apiClient } from '@/lib/api/apiClient';
+import { creditsApi } from '@/lib/api/credits';
 
 interface ChatMessage {
   id: string; // Unique identifier for React keys
@@ -280,6 +281,7 @@ export default function CompaneonChatInterface({
   }>>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const lastHistoryFetchRef = useRef<number>(0);
+  const [creditCount, setCreditCount] = useState<number | null>(null);
 
   // Generate unique message ID
   const generateMessageId = () => {
@@ -990,7 +992,29 @@ export default function CompaneonChatInterface({
       setIsConnecting(false);
       connectionInProgressRef.current = false;
 
-      
+      // Fetch credit balance (auto-grant happens on session creation in API service)
+      const walletAddr = contextData.userAddress || address;
+      if (walletAddr) {
+        try {
+          const balance = await creditsApi.getBalance(walletAddr);
+          setCreditCount(balance.remaining);
+          // If free credits weren't granted yet (e.g., session created before credits system),
+          // grant them now
+          if (!balance.freeCreditsGranted) {
+            try {
+              const grantResult = await creditsApi.grantFree(walletAddr);
+              setCreditCount(grantResult.remaining);
+            } catch (grantErr) {
+              // May fail if already granted - that's fine
+            }
+          }
+        } catch (creditErr) {
+          // Non-blocking - continue even if credit fetch fails
+          console.error('Failed to fetch credits:', creditErr);
+        }
+      }
+
+
     } catch (error: any) {
       
       setIsConnecting(false);
@@ -1015,7 +1039,18 @@ export default function CompaneonChatInterface({
   const sendMessage = async (messageText?: string) => {
     const message = messageText || inputMessage.trim();
     if (!message || !isConnected || !agentSessionId) {
-      
+
+      return;
+    }
+
+    // Check credits before sending
+    if (creditCount !== null && creditCount <= 0) {
+      setMessages(prev => [...prev, {
+        id: generateMessageId(),
+        type: 'system',
+        message: 'No credits remaining. Go to Account in the dashboard to purchase more credits.',
+        timestamp: new Date().toISOString()
+      }]);
       return;
     }
 
@@ -1716,9 +1751,23 @@ export default function CompaneonChatInterface({
               currentTxHashes = []; // Reset txHashes for next message
               setIsTyping(false);
 
-              
+              // Decrement local credit count after successful response
+              setCreditCount(prev => prev !== null ? Math.max(0, prev - 1) : null);
+
+
             } else if (event.type === 'error') {
               // Handle error events from the agent
+
+              // Handle no credits error specifically
+              if (event.code === 'NO_CREDITS') {
+                setCreditCount(0);
+                setMessages(prev => [...prev, {
+                  id: generateMessageId(),
+                  type: 'system',
+                  message: 'No credits remaining. Go to Account in the dashboard to purchase more credits.',
+                  timestamp: new Date().toISOString()
+                }]);
+              }
 
               setIsTyping(false);
               setIsStreamActive(false);
@@ -1980,7 +2029,18 @@ export default function CompaneonChatInterface({
       <div className="bg-white rounded-[8px] p-6 w-full flex flex-col h-full relative">
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0 mb-4">
-        <h2 className="text-xl font-medium">AI Companeon</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-xl font-medium">AI Companeon</h2>
+          {isConnected && creditCount !== null && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              creditCount <= 0 ? 'bg-red-100 text-red-700' :
+              creditCount <= 5 ? 'bg-yellow-100 text-yellow-700' :
+              'bg-gray-100 text-gray-600'
+            }`}>
+              {creditCount} credit{creditCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
 
           {isConnected && (
@@ -2070,6 +2130,13 @@ export default function CompaneonChatInterface({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Low credits warning */}
+      {isConnected && creditCount !== null && creditCount > 0 && creditCount <= 5 && (
+        <div className="flex-shrink-0 mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+          {creditCount} credit{creditCount !== 1 ? 's' : ''} remaining. Visit Account to purchase more.
         </div>
       )}
 

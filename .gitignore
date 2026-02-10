@@ -28,6 +28,9 @@ Thumbs.db
 # Skills (local CLI tools)
 .skills/
 
+# Large media files
+*.mp4
+
 # Build outputs
 dist/
 build/
