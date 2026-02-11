@@ -1,15 +1,6 @@
 import { ChainConfig, ChainType } from '../types';
 
 const CHAINS: Record<ChainType, ChainConfig> = {
-  base: {
-    name: 'Base',
-    shortName: 'base',
-    chainId: 8453,
-    chainIdHex: '0x2105',
-    rpcUrl: 'https://mainnet.base.org',
-    blockExplorer: 'https://basescan.org',
-    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
-  },
   mainnet: {
     name: 'Ethereum',
     shortName: 'mainnet',
@@ -30,10 +21,10 @@ const CHAINS: Record<ChainType, ChainConfig> = {
   },
 };
 
-export function getChainType(input?: string, fallback: ChainType = 'base'): ChainType {
+export function getChainType(input?: string, fallback: ChainType = 'mainnet'): ChainType {
   if (!input) return fallback;
   const key = input.toLowerCase();
-  if (key === 'base' || key === 'mainnet' || key === 'sepolia') return key as ChainType;
+  if (key === 'mainnet' || key === 'sepolia') return key as ChainType;
   return fallback;
 }
 
@@ -44,7 +35,7 @@ export function getChainConfig(chain: ChainType): ChainConfig {
 export function isValidChain(input?: string): boolean {
   if (!input) return false;
   const key = input.toLowerCase();
-  return key === 'base' || key === 'mainnet' || key === 'sepolia';
+  return key === 'mainnet' || key === 'sepolia';
 }
 
 export { CHAINS };

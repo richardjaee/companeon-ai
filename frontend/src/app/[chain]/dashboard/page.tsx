@@ -29,7 +29,7 @@ function DashboardPageContent() {
         return <AccountView />;
       case 'portfolio':
       default:
-        return <PortfolioView />;
+        return <PortfolioView onNavigateToAccount={() => setCurrentSection('account')} />;
     }
   };
 

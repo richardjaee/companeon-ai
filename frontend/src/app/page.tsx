@@ -76,17 +76,17 @@ export default function HomePage() {
 
   const handleConnectWallet = async (walletType: string) => {
     if (isConnected) {
-      router.push('/base/dashboard');
+      router.push('/mainnet/dashboard');
       return;
     }
 
     try {
       setIsLoading(true);
-      const result = await connectWallet(walletType as 'metamask' | 'coinbase');
+      const result = await connectWallet(walletType as 'metamask');
 
       if (result && typeof result === 'string') {
         setShowConnectModal(false);
-        router.push('/base/dashboard');
+        router.push('/mainnet/dashboard');
       }
     } catch (error) {
       Sentry.captureException(error);
@@ -99,7 +99,7 @@ export default function HomePage() {
     setIsAuthenticated(true);
 
     if (window.location.pathname === '/') {
-      router.push('/base/dashboard');
+      router.push('/mainnet/dashboard');
     } else {
       window.location.reload();
     }
@@ -110,12 +110,12 @@ export default function HomePage() {
       setShowConnectModal(true);
       return;
     }
-    router.push('/base/dashboard');
+    router.push('/mainnet/dashboard');
   };
 
   const getButtonText = () => {
     if (isLoading) return 'Connecting...';
-    if (isConnected && address) return 'Go to dashboard';
+    if (isConnected && address) return 'Launch app';
     return 'Get started';
   };
 
@@ -146,6 +146,11 @@ export default function HomePage() {
           }}
           onCanPlay={(e) => {
             const video = e.target as HTMLVideoElement;
+            video.play().catch(console.error);
+          }}
+          onEnded={(e) => {
+            const video = e.target as HTMLVideoElement;
+            video.currentTime = 0;
             video.play().catch(console.error);
           }}
         >
@@ -182,39 +187,36 @@ export default function HomePage() {
                   </span>
                 </button>
 
-                <a
-                  href="#how-it-works"
+                <button
+                  onClick={() => {
+                    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                   className="bg-transparent border-2 border-white text-white text-[16px] rounded-full hover:bg-white hover:text-gray-900 transition-all z-30 relative inline-flex items-center justify-center h-12"
                   style={{ paddingLeft: '24px', paddingRight: '24px' }}
                 >
                   <span className="font-medium">
                     How it works
                   </span>
-                </a>
+                </button>
               </div>
 
               {/* Social proof - Desktop */}
-              <div className="hidden lg:flex flex-col items-start mt-16">
-                <p className="text-xs font-normal text-gray-500 mb-1">
-                  1st Place
-                </p>
-                <div className="flex items-center gap-3">
-                  <svg width="32" height="32" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M32.96 1L19.62 10.93l2.47-5.85L32.96 1z" fill="#E17726" stroke="#E17726" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M2.04 1l13.22 10.03-2.35-5.95L2.04 1zM28.15 23.53l-3.55 5.44 7.6 2.09 2.18-7.4-6.23-.13zM.64 23.66l2.17 7.4 7.59-2.09-3.54-5.44-6.22.13z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M10.07 14.51l-2.12 3.2 7.55.34-.25-8.13-5.18 4.59zM24.93 14.51l-5.24-4.69-.17 8.23 7.54-.34-2.13-3.2zM10.4 28.97l4.54-2.2-3.92-3.06-.62 5.26zM20.06 26.77l4.53 2.2-.61-5.26-3.92 3.06z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M24.59 28.97l-4.53-2.2.36 2.96-.04 1.25 4.21-1.99zM10.4 28.97l4.22 2.01-.03-1.25.35-2.96-4.54 2.2z" fill="#D5BFB2" stroke="#D5BFB2" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M14.7 21.93l-3.78-1.11 2.67-1.22 1.11 2.33zM20.3 21.93l1.11-2.33 2.68 1.22-3.79 1.11z" fill="#233447" stroke="#233447" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M10.4 28.97l.65-5.44-4.19.13 3.54 5.31zM23.95 23.53l.64 5.44 3.55-5.31-4.19-.13zM27.06 17.71l-7.54.34.7 3.88 1.11-2.33 2.68 1.22 3.05-3.11zM10.92 20.82l2.67-1.22 1.11 2.33.7-3.88-7.55-.34 3.07 3.11z" fill="#CC6228" stroke="#CC6228" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M7.95 17.71l3.17 6.18-.11-3.07-3.06-3.11zM24.01 20.82l-.12 3.07 3.17-6.18-3.05 3.11zM15.5 18.05l-.7 3.88.88 4.54.2-5.98-.38-2.44zM19.52 18.05l-.37 2.43.18 5.99.88-4.54-.69-3.88z" fill="#E27525" stroke="#E27525" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M20.22 21.93l-.88 4.54.63.44 3.92-3.06.12-3.07-3.79 1.15zM10.92 20.82l.11 3.07 3.92 3.06.63-.44-.88-4.54-3.78-1.15z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M20.26 30.98l.04-1.25-.34-.3h-4.92l-.33.3.03 1.25-4.34-2.01 1.52 1.24 3.07 2.13h5.01l3.08-2.13 1.51-1.24-4.33 2.01z" fill="#C0AC9D" stroke="#C0AC9D" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M20.06 26.77l-.63-.44h-3.86l-.63.44-.35 2.96.33-.3h4.92l.34.3-.12-2.96z" fill="#161616" stroke="#161616" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M33.52 11.35l1.13-5.45L32.96 1l-12.9 9.57 4.97 4.2 7.02 2.05 1.55-1.81-.67-.49 1.07-.97-.82-.64 1.07-.81-.71-.53zM.35 5.9l1.14 5.45-.73.53 1.07.81-.82.64 1.07.97-.68.49 1.55 1.81 7.02-2.05 4.97-4.2L2.04 1 .35 5.9z" fill="#763E1A" stroke="#763E1A" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M32.05 16.82l-7.02-2.05 2.13 3.2-3.17 6.18 4.16-.05h6.22l-2.32-7.28zM10.07 14.77l-7.02 2.05-2.32 7.28h6.22l4.16.05-3.17-6.18 2.13-3.2zM19.52 18.05l.45-7.78 2.05-5.19H12.91l2.04 5.19.45 7.78.17 2.44.01 5.98h3.86l.01-5.98.08-2.44z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="text-sm font-normal text-gray-300">First Place in MetaMask Advanced Permissions Hackathon</span>
-                </div>
+              <div className="hidden lg:flex items-center gap-3 mt-16">
+                <svg width="32" height="32" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M32.96 1L19.62 10.93l2.47-5.85L32.96 1z" fill="#E17726" stroke="#E17726" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M2.04 1l13.22 10.03-2.35-5.95L2.04 1zM28.15 23.53l-3.55 5.44 7.6 2.09 2.18-7.4-6.23-.13zM.64 23.66l2.17 7.4 7.59-2.09-3.54-5.44-6.22.13z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10.07 14.51l-2.12 3.2 7.55.34-.25-8.13-5.18 4.59zM24.93 14.51l-5.24-4.69-.17 8.23 7.54-.34-2.13-3.2zM10.4 28.97l4.54-2.2-3.92-3.06-.62 5.26zM20.06 26.77l4.53 2.2-.61-5.26-3.92 3.06z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M24.59 28.97l-4.53-2.2.36 2.96-.04 1.25 4.21-1.99zM10.4 28.97l4.22 2.01-.03-1.25.35-2.96-4.54 2.2z" fill="#D5BFB2" stroke="#D5BFB2" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M14.7 21.93l-3.78-1.11 2.67-1.22 1.11 2.33zM20.3 21.93l1.11-2.33 2.68 1.22-3.79 1.11z" fill="#233447" stroke="#233447" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M10.4 28.97l.65-5.44-4.19.13 3.54 5.31zM23.95 23.53l.64 5.44 3.55-5.31-4.19-.13zM27.06 17.71l-7.54.34.7 3.88 1.11-2.33 2.68 1.22 3.05-3.11zM10.92 20.82l2.67-1.22 1.11 2.33.7-3.88-7.55-.34 3.07 3.11z" fill="#CC6228" stroke="#CC6228" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M7.95 17.71l3.17 6.18-.11-3.07-3.06-3.11zM24.01 20.82l-.12 3.07 3.17-6.18-3.05 3.11zM15.5 18.05l-.7 3.88.88 4.54.2-5.98-.38-2.44zM19.52 18.05l-.37 2.43.18 5.99.88-4.54-.69-3.88z" fill="#E27525" stroke="#E27525" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20.22 21.93l-.88 4.54.63.44 3.92-3.06.12-3.07-3.79 1.15zM10.92 20.82l.11 3.07 3.92 3.06.63-.44-.88-4.54-3.78-1.15z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20.26 30.98l.04-1.25-.34-.3h-4.92l-.33.3.03 1.25-4.34-2.01 1.52 1.24 3.07 2.13h5.01l3.08-2.13 1.51-1.24-4.33 2.01z" fill="#C0AC9D" stroke="#C0AC9D" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20.06 26.77l-.63-.44h-3.86l-.63.44-.35 2.96.33-.3h4.92l.34.3-.12-2.96z" fill="#161616" stroke="#161616" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M33.52 11.35l1.13-5.45L32.96 1l-12.9 9.57 4.97 4.2 7.02 2.05 1.55-1.81-.67-.49 1.07-.97-.82-.64 1.07-.81-.71-.53zM.35 5.9l1.14 5.45-.73.53 1.07.81-.82.64 1.07.97-.68.49 1.55 1.81 7.02-2.05 4.97-4.2L2.04 1 .35 5.9z" fill="#763E1A" stroke="#763E1A" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M32.05 16.82l-7.02-2.05 2.13 3.2-3.17 6.18 4.16-.05h6.22l-2.32-7.28zM10.07 14.77l-7.02 2.05-2.32 7.28h6.22l4.16.05-3.17-6.18 2.13-3.2zM19.52 18.05l.45-7.78 2.05-5.19H12.91l2.04 5.19.45 7.78.17 2.44.01 5.98h3.86l.01-5.98.08-2.44z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-sm font-normal text-gray-300">MetaMask Hackathon Winner</span>
               </div>
             </div>
 
@@ -232,17 +234,7 @@ export default function HomePage() {
                       aspectRatio: '16 / 9',
                       border: '1px solid #111827'
                     }}>
-                      <video
-                        autoPlay
-                        loop
-                        muted
-                        playsInline
-                        className="w-full h-full object-cover"
-                        style={{ objectPosition: 'center' }}
-                      >
-                        <source src="/animations/hero-video.mp4" type="video/mp4" />
-                      </video>
-                      <div className="absolute inset-0 bg-gradient-to-br from-white/3 via-transparent to-transparent pointer-events-none"></div>
+                      <RemotionPlayer composition="hero-demo" />
                     </div>
                   </div>
 
@@ -267,27 +259,22 @@ export default function HomePage() {
           </div>
 
           {/* Social proof - Mobile */}
-          <div className="lg:hidden flex flex-col items-center mt-16 px-6">
-            <p className="text-xs font-normal text-gray-500 mb-1">
-              1st Place
-            </p>
-            <div className="flex items-center gap-3">
-              <svg width="32" height="32" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M32.96 1L19.62 10.93l2.47-5.85L32.96 1z" fill="#E17726" stroke="#E17726" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M2.04 1l13.22 10.03-2.35-5.95L2.04 1zM28.15 23.53l-3.55 5.44 7.6 2.09 2.18-7.4-6.23-.13zM.64 23.66l2.17 7.4 7.59-2.09-3.54-5.44-6.22.13z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M10.07 14.51l-2.12 3.2 7.55.34-.25-8.13-5.18 4.59zM24.93 14.51l-5.24-4.69-.17 8.23 7.54-.34-2.13-3.2zM10.4 28.97l4.54-2.2-3.92-3.06-.62 5.26zM20.06 26.77l4.53 2.2-.61-5.26-3.92 3.06z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M24.59 28.97l-4.53-2.2.36 2.96-.04 1.25 4.21-1.99zM10.4 28.97l4.22 2.01-.03-1.25.35-2.96-4.54 2.2z" fill="#D5BFB2" stroke="#D5BFB2" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M14.7 21.93l-3.78-1.11 2.67-1.22 1.11 2.33zM20.3 21.93l1.11-2.33 2.68 1.22-3.79 1.11z" fill="#233447" stroke="#233447" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M10.4 28.97l.65-5.44-4.19.13 3.54 5.31zM23.95 23.53l.64 5.44 3.55-5.31-4.19-.13zM27.06 17.71l-7.54.34.7 3.88 1.11-2.33 2.68 1.22 3.05-3.11zM10.92 20.82l2.67-1.22 1.11 2.33.7-3.88-7.55-.34 3.07 3.11z" fill="#CC6228" stroke="#CC6228" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M7.95 17.71l3.17 6.18-.11-3.07-3.06-3.11zM24.01 20.82l-.12 3.07 3.17-6.18-3.05 3.11zM15.5 18.05l-.7 3.88.88 4.54.2-5.98-.38-2.44zM19.52 18.05l-.37 2.43.18 5.99.88-4.54-.69-3.88z" fill="#E27525" stroke="#E27525" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20.22 21.93l-.88 4.54.63.44 3.92-3.06.12-3.07-3.79 1.15zM10.92 20.82l.11 3.07 3.92 3.06.63-.44-.88-4.54-3.78-1.15z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20.26 30.98l.04-1.25-.34-.3h-4.92l-.33.3.03 1.25-4.34-2.01 1.52 1.24 3.07 2.13h5.01l3.08-2.13 1.51-1.24-4.33 2.01z" fill="#C0AC9D" stroke="#C0AC9D" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M20.06 26.77l-.63-.44h-3.86l-.63.44-.35 2.96.33-.3h4.92l.34.3-.12-2.96z" fill="#161616" stroke="#161616" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M33.52 11.35l1.13-5.45L32.96 1l-12.9 9.57 4.97 4.2 7.02 2.05 1.55-1.81-.67-.49 1.07-.97-.82-.64 1.07-.81-.71-.53zM.35 5.9l1.14 5.45-.73.53 1.07.81-.82.64 1.07.97-.68.49 1.55 1.81 7.02-2.05 4.97-4.2L2.04 1 .35 5.9z" fill="#763E1A" stroke="#763E1A" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M32.05 16.82l-7.02-2.05 2.13 3.2-3.17 6.18 4.16-.05h6.22l-2.32-7.28zM10.07 14.77l-7.02 2.05-2.32 7.28h6.22l4.16.05-3.17-6.18 2.13-3.2zM19.52 18.05l.45-7.78 2.05-5.19H12.91l2.04 5.19.45 7.78.17 2.44.01 5.98h3.86l.01-5.98.08-2.44z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span className="text-sm font-normal text-gray-300">MetaMask Grants DAO Hackathon</span>
-            </div>
+          <div className="lg:hidden flex items-center justify-center gap-3 mt-16 px-6">
+            <svg width="32" height="32" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M32.96 1L19.62 10.93l2.47-5.85L32.96 1z" fill="#E17726" stroke="#E17726" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M2.04 1l13.22 10.03-2.35-5.95L2.04 1zM28.15 23.53l-3.55 5.44 7.6 2.09 2.18-7.4-6.23-.13zM.64 23.66l2.17 7.4 7.59-2.09-3.54-5.44-6.22.13z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M10.07 14.51l-2.12 3.2 7.55.34-.25-8.13-5.18 4.59zM24.93 14.51l-5.24-4.69-.17 8.23 7.54-.34-2.13-3.2zM10.4 28.97l4.54-2.2-3.92-3.06-.62 5.26zM20.06 26.77l4.53 2.2-.61-5.26-3.92 3.06z" fill="#E27625" stroke="#E27625" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M24.59 28.97l-4.53-2.2.36 2.96-.04 1.25 4.21-1.99zM10.4 28.97l4.22 2.01-.03-1.25.35-2.96-4.54 2.2z" fill="#D5BFB2" stroke="#D5BFB2" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14.7 21.93l-3.78-1.11 2.67-1.22 1.11 2.33zM20.3 21.93l1.11-2.33 2.68 1.22-3.79 1.11z" fill="#233447" stroke="#233447" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M10.4 28.97l.65-5.44-4.19.13 3.54 5.31zM23.95 23.53l.64 5.44 3.55-5.31-4.19-.13zM27.06 17.71l-7.54.34.7 3.88 1.11-2.33 2.68 1.22 3.05-3.11zM10.92 20.82l2.67-1.22 1.11 2.33.7-3.88-7.55-.34 3.07 3.11z" fill="#CC6228" stroke="#CC6228" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M7.95 17.71l3.17 6.18-.11-3.07-3.06-3.11zM24.01 20.82l-.12 3.07 3.17-6.18-3.05 3.11zM15.5 18.05l-.7 3.88.88 4.54.2-5.98-.38-2.44zM19.52 18.05l-.37 2.43.18 5.99.88-4.54-.69-3.88z" fill="#E27525" stroke="#E27525" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M20.22 21.93l-.88 4.54.63.44 3.92-3.06.12-3.07-3.79 1.15zM10.92 20.82l.11 3.07 3.92 3.06.63-.44-.88-4.54-3.78-1.15z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M20.26 30.98l.04-1.25-.34-.3h-4.92l-.33.3.03 1.25-4.34-2.01 1.52 1.24 3.07 2.13h5.01l3.08-2.13 1.51-1.24-4.33 2.01z" fill="#C0AC9D" stroke="#C0AC9D" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M20.06 26.77l-.63-.44h-3.86l-.63.44-.35 2.96.33-.3h4.92l.34.3-.12-2.96z" fill="#161616" stroke="#161616" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M33.52 11.35l1.13-5.45L32.96 1l-12.9 9.57 4.97 4.2 7.02 2.05 1.55-1.81-.67-.49 1.07-.97-.82-.64 1.07-.81-.71-.53zM.35 5.9l1.14 5.45-.73.53 1.07.81-.82.64 1.07.97-.68.49 1.55 1.81 7.02-2.05 4.97-4.2L2.04 1 .35 5.9z" fill="#763E1A" stroke="#763E1A" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M32.05 16.82l-7.02-2.05 2.13 3.2-3.17 6.18 4.16-.05h6.22l-2.32-7.28zM10.07 14.77l-7.02 2.05-2.32 7.28h6.22l4.16.05-3.17-6.18 2.13-3.2zM19.52 18.05l.45-7.78 2.05-5.19H12.91l2.04 5.19.45 7.78.17 2.44.01 5.98h3.86l.01-5.98.08-2.44z" fill="#F5841F" stroke="#F5841F" strokeWidth="0.25" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-sm font-normal text-gray-300">MetaMask Hackathon Winner</span>
           </div>
         </div>
       </div>
@@ -433,7 +420,9 @@ export default function HomePage() {
       <TweetSection />
 
       {/* FAQ Section */}
-      <FAQSection />
+      <div id="faqs">
+        <FAQSection />
+      </div>
 
       {/* CTA Section */}
       <div className="bg-black py-[115px]">
@@ -451,7 +440,7 @@ export default function HomePage() {
                   className="bg-[#AD29FF] hover:bg-[#9523DC] text-white text-[16px] rounded-full transition-all disabled:opacity-50 h-12 flex items-center justify-center font-medium"
                   style={{ paddingLeft: '24px', paddingRight: '24px' }}
                 >
-                  {isConnected && address ? 'Go to dashboard' : 'Get started'}
+                  {isConnected && address ? 'Launch app' : 'Get started'}
                 </button>
               </div>
             </div>

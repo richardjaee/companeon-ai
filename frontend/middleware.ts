@@ -3,10 +3,10 @@ import type { NextRequest } from 'next/server';
 
 /**
  * Middleware to handle chain-based routing
- * Redirects old URLs to /base prefix for backwards compatibility
+ * Redirects bare URLs to /mainnet prefix
  */
 
-// Routes that should be redirected to /base
+// Routes that need a chain prefix
 const CHAIN_ROUTES = [
   '/dashboard',
   '/portfolio',
@@ -58,7 +58,7 @@ export function middleware(request: NextRequest) {
   }
 
   // Skip if already has chain prefix
-  if (pathname.startsWith('/base/') || pathname.startsWith('/mainnet/')) {
+  if (pathname.startsWith('/mainnet/') || pathname.startsWith('/sepolia/')) {
     return NextResponse.next();
   }
 
@@ -74,8 +74,7 @@ export function middleware(request: NextRequest) {
   });
 
   if (needsRedirect) {
-    // Redirect to /base prefix
-    const newUrl = new URL(`/base${pathname}${request.nextUrl.search}`, request.url);
+    const newUrl = new URL(`/mainnet${pathname}${request.nextUrl.search}`, request.url);
     return NextResponse.redirect(newUrl);
   }
 

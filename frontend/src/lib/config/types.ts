@@ -1,4 +1,4 @@
-export type ChainType = 'base' | 'mainnet' | 'sepolia';
+export type ChainType = 'mainnet' | 'sepolia';
 
 export interface ChainConfig {
   name: string;

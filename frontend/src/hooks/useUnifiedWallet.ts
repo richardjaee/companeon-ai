@@ -1,6 +1,6 @@
 import { useWallet } from '@/context/WalletContext';
 
-export type UnifiedWalletType = 'metamask' | 'coinbase' | 'trust' | 'brave' | 'rabby' | 'walletconnect' | 'web3auth' | null;
+export type UnifiedWalletType = 'metamask' | null;
 export type UnifiedChainType = 'ethereum' | null;
 
 interface UnifiedWalletContextType {
@@ -32,7 +32,7 @@ export function useUnifiedWallet(): UnifiedWalletContextType {
       return null;
     }
     try {
-      const result = await ethereumWallet.connectWallet(type as 'metamask' | 'coinbase' | 'trust' | 'brave' | 'rabby' | 'walletconnect' | 'web3auth');
+      const result = await ethereumWallet.connectWallet(type as 'metamask');
       return result;
     } catch (error) {
       throw error;

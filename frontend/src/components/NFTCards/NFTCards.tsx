@@ -340,7 +340,7 @@ export default function NFTCards({
                     <h3 className="text-base font-semibold truncate leading-none mb-0">
                       {!isFilteredContract && asset?.contract ? (
                         <a 
-                          href={`https://basescan.org/address/${asset.contract}`}
+                          href={`${config.blockExplorer}/address/${asset.contract}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="hover:underline"

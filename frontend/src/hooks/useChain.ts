@@ -22,7 +22,7 @@ export function useChain() {
 
   // Determine current chain
   const chain: ChainType = useMemo(() => {
-    return getChainType(chainParam, 'base');
+    return getChainType(chainParam, 'mainnet');
   }, [chainParam]);
 
   // Get chain configuration
@@ -54,6 +54,6 @@ export function useChain() {
 export function useChainConfig() {
   const params = useParams();
   const chainParam = params?.chain as string | undefined;
-  const chain = getChainType(chainParam, 'base');
+  const chain = getChainType(chainParam, 'mainnet');
   return getChainConfig(chain);
 }

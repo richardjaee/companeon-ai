@@ -31,7 +31,7 @@ export const BASE_TOKENS: Record<string, TokenData> = {
     "symbol": "WETH",
     "name": "Wrapped Ether",
     "decimals": 18,
-    "categories": ["layer1-blockchains","base-ecosystem"],
+    "categories": ["layer1-blockchains"],
     "description": "Wrapped Ether on Base used for routing and liquidity."
   },
   // UNI (Base deployment)
@@ -39,7 +39,7 @@ export const BASE_TOKENS: Record<string, TokenData> = {
     "symbol": "UNI",
     "name": "Uniswap",
     "decimals": 18,
-    "categories": ["defi-protocols","dao-governance","base-ecosystem"],
+    "categories": ["defi-protocols","dao-governance"],
     "description": "Uniswap governance token on Base."
   },
   // AAVE (Base deployment)
@@ -47,7 +47,7 @@ export const BASE_TOKENS: Record<string, TokenData> = {
     "symbol": "AAVE",
     "name": "Aave",
     "decimals": 18,
-    "categories": ["defi-protocols","dao-governance","base-ecosystem"],
+    "categories": ["defi-protocols","dao-governance"],
     "description": "Aave governance token on Base."
   },
   "0xbaa5cc21fd487b8fcc2f632f3f4e8d37262a0842": {

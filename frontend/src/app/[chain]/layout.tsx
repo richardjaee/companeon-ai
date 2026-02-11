@@ -27,7 +27,6 @@ export default async function ChainLayout({ children, params }: ChainLayoutProps
  */
 export function generateStaticParams() {
   return [
-    { chain: 'base' },
     { chain: 'mainnet' },
     { chain: 'sepolia' },
   ];

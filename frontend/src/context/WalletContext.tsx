@@ -13,19 +13,13 @@ import React, {
 import { usePathname } from 'next/navigation';
 import { ethers } from 'ethers';
 import { MetaMaskProvider } from '@/lib/wallets/metamask';
-import { CoinbaseProvider } from '@/lib/wallets/coinbase';
-import { TrustWalletProvider } from '@/lib/wallets/trust';
-import { BraveWalletProvider } from '@/lib/wallets/brave';
-import { RabbyProvider } from '@/lib/wallets/rabby';
-import { WalletConnectProvider } from '@/lib/wallets/walletconnect';
-import { Web3AuthProvider } from '@/lib/wallets/web3auth';
 import type { BaseWalletProvider } from '@/lib/wallets/baseWalletProvider';
 import * as Sentry from '@sentry/nextjs';
 import { STORAGE_KEYS, getStorageItem, setStorageItem, removeStorageItem, clearWalletStorage } from '@/lib/constants/storage';
 import { requestEIP6963Providers, getCachedEIP6963Providers } from '@/lib/wallets/eip6963';
 import { getChainConfig, getChainType } from '@/lib/config';
 
-export type EthereumWalletType = 'metamask' | 'coinbase' | 'trust' | 'brave' | 'rabby' | 'walletconnect' | 'web3auth';
+export type EthereumWalletType = 'metamask';
 export type WalletType = EthereumWalletType | null;
 export type ChainType = 'ethereum' | null;
 
@@ -86,14 +80,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   /**
  * Ensure wallet is on the correct network based on current route
- * Detects chain from URL pathname (/base/* or /mainnet/*)
+ * Detects chain from URL pathname (/mainnet/* or /sepolia/*)
  */
   const ensureCorrectNetwork = useCallback(async () => {
     if (typeof window === 'undefined') return;
 
     // Detect chain from URL
-    const chainMatch = pathname?.match(/^\/(base|mainnet)\//);
-    const currentChain = chainMatch ? chainMatch[1] : 'base';
+    const chainMatch = pathname?.match(/^\/(mainnet|sepolia)\//);
+    const currentChain = chainMatch ? chainMatch[1] : 'mainnet';
     const chainConfig = getChainConfig(getChainType(currentChain));
 
     const anyWindow = window as any;
@@ -195,18 +189,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       switch (type) {
         case 'metamask':
           return new MetaMaskProvider();
-        case 'coinbase':
-          return new CoinbaseProvider();
-        case 'trust':
-          return new TrustWalletProvider();
-        case 'brave':
-          return new BraveWalletProvider();
-        case 'rabby':
-          return new RabbyProvider();
-        case 'walletconnect':
-          return new WalletConnectProvider();
-        case 'web3auth':
-          return new Web3AuthProvider();
         default:
           return null;
       }
@@ -278,9 +260,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         'companeon_metamask_pending_timestamp',
         'companeon_metamask_signature_pending',
         'companeon_metamask_signature_timestamp',
-        'companeon_cb_connected_account',
-        'companeon_cb_debug_info',
-        'companeon_cb_device_info',
         'companeon_user_initiated_connect',
         'auth_declined',
         'auth_modal_closed',
@@ -292,27 +271,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         'companeon_wallet_address',
         'wallet_address',
         'eth_address',
-        'solana_address',
         'connected_address'
       ];
       
       sessionKeysToRemove.forEach(key => {
-        sessionStorage.removeItem(key);
-      });
-      
-      localStorageKeys.filter(key => key.startsWith('walletlink:') || key.startsWith('-walletlink:')).forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      sessionStorageKeys.filter(key => key.startsWith('walletlink:') || key.startsWith('-walletlink:')).forEach(key => {
-        sessionStorage.removeItem(key);
-      });
-      
-      localStorageKeys.filter(key => key.includes('coinbase') || key.includes('cb_')).forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      sessionStorageKeys.filter(key => key.includes('coinbase') || key.includes('cb_')).forEach(key => {
         sessionStorage.removeItem(key);
       });
       
@@ -361,19 +323,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
            const allSessionKeys = Object.keys(sessionStorage);
            
            allLocalKeys.forEach(key => {
-             if (key.includes('wallet') || key.includes('companeon') || key.includes('metamask') || 
-                 key.includes('coinbase') || key.includes('auth') || key.includes('connect') ||
-                 key.includes('brave') || key.includes('trust') || key.startsWith('walletlink') ||
-                 key.startsWith('-walletlink')) {
+             if (key.includes('wallet') || key.includes('companeon') || key.includes('metamask') ||
+                 key.includes('auth') || key.includes('connect')) {
                localStorage.removeItem(key);
              }
            });
-           
+
            allSessionKeys.forEach(key => {
-             if (key.includes('wallet') || key.includes('companeon') || key.includes('metamask') || 
-                 key.includes('coinbase') || key.includes('auth') || key.includes('connect') ||
-                 key.includes('brave') || key.includes('trust') || key.startsWith('walletlink') ||
-                 key.startsWith('-walletlink')) {
+             if (key.includes('wallet') || key.includes('companeon') || key.includes('metamask') ||
+                 key.includes('auth') || key.includes('connect')) {
                sessionStorage.removeItem(key);
              }
            });
@@ -648,7 +606,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           throw new Error('No wallet address returned from connection');
         }
 
-        // Enforce Base network for EVM wal before finalizing connection
+        // Ensure correct network for EVM wallet before finalizing connection
         if (type) {
           await ensureCorrectNetwork();
         }
@@ -814,7 +772,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             }
             
             if (connectedAddress) {
-              // Enforce Base network for EVM wal before restoring connection
+              // Ensure correct network for EVM wallet before restoring connection
               if (savedWalletType) {
                 await ensureCorrectNetwork();
               }
@@ -878,27 +836,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             
           if (savedWalletChoice) {
             
-            let tempProvider: BaseWalletProvider;
-            switch (savedWalletChoice) {
-              case 'metamask':
-                tempProvider = new MetaMaskProvider();
-                break;
-              case 'coinbase':
-                tempProvider = new CoinbaseProvider();
-                break;
-              case 'trust':
-                tempProvider = new TrustWalletProvider();
-                break;
-              case 'brave':
-                tempProvider = new BraveWalletProvider();
-                break;
-              case 'rabby':
-                tempProvider = new RabbyProvider();
-                break;
-              default:
-
-                tempProvider = new MetaMaskProvider();
-            }
+            const tempProvider: BaseWalletProvider = new MetaMaskProvider();
             
             try {
 

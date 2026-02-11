@@ -1,9 +1,8 @@
-import { sepolia, base, mainnet } from 'viem/chains';
+import { sepolia, mainnet } from 'viem/chains';
 import type { Chain } from 'viem';
 
 const CHAIN_MAP: Record<number, Chain> = {
   11155111: sepolia,
-  8453: base,
   1: mainnet,
 };
 
@@ -15,7 +14,6 @@ export function getViemChain(chainId: number): Chain {
 
 export const CHAIN_PARAMS: Record<number, { hex: string; name: string; rpc: string; explorer: string }> = {
   11155111: { hex: '0xaa36a7', name: 'Sepolia', rpc: 'https://rpc.sepolia.org', explorer: 'https://sepolia.etherscan.io' },
-  8453: { hex: '0x2105', name: 'Base', rpc: 'https://mainnet.base.org', explorer: 'https://basescan.org' },
   1: { hex: '0x1', name: 'Ethereum', rpc: 'https://rpc.ankr.com/eth', explorer: 'https://etherscan.io' },
 };
 

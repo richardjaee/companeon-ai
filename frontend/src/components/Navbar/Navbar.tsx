@@ -12,7 +12,7 @@ import * as Sentry from '@sentry/nextjs';
 import Image from 'next/image';
 import { ChevronDownIcon } from '@heroicons/react/24/outline';
 
-type ConnectWalletType = 'metamask' | 'coinbase' | 'trust' | 'brave';
+type ConnectWalletType = 'metamask';
 
 interface NFTMetadata {
   name: string | null;
@@ -61,23 +61,16 @@ export default function Navbar() {
 
   const getChainPath = async (): Promise<string> => {
     try {
-      if (typeof window === 'undefined' || !window.ethereum) return 'base';
+      if (typeof window === 'undefined' || !window.ethereum) return 'mainnet';
 
-      // Get current chainId from MetaMask
       const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-
-      // Convert hex to decimal
       const chainIdDecimal = parseInt(chainId as string, 16);
 
-      // Return appropriate chain path
-      if (chainIdDecimal === 1) return 'mainnet';  // Ethereum Mainnet
-      if (chainIdDecimal === 8453) return 'base';  // Base
+      if (chainIdDecimal === 11155111) return 'sepolia';
 
-      // Default to base for other networks
-      return 'base';
+      return 'mainnet';
     } catch (error) {
-      // Default to base if detection fails
-      return 'base';
+      return 'mainnet';
     }
   };
 
@@ -113,32 +106,23 @@ export default function Navbar() {
 
     const handleChainChanged = async (chainIdHex: string) => {
       try {
-        // Convert hex chainId to decimal
         const newChainId = parseInt(chainIdHex, 16);
 
-        // Determine which chain path this corresponds to
         let newChainPath: string;
-        if (newChainId === 1) {
-          newChainPath = 'mainnet';
-        } else if (newChainId === 8453) {
-          newChainPath = 'base';
+        if (newChainId === 11155111) {
+          newChainPath = 'sepolia';
         } else {
-          newChainPath = 'base'; // Default to base for unsupported chains
+          newChainPath = 'mainnet';
         }
 
-        // Check current path and only navigate if chain changed
         const currentPath = window.location.pathname;
-        const isOnBaseRoute = currentPath.includes('/base/');
         const isOnMainnetRoute = currentPath.includes('/mainnet/');
+        const isOnSepoliaRoute = currentPath.includes('/sepolia/');
 
-        // Only navigate if the network doesn't match the current route
-        if ((newChainPath === 'base' && !isOnBaseRoute) ||
-            (newChainPath === 'mainnet' && !isOnMainnetRoute)) {
-
-          // Navigate to the correct chain's dashboard
+        if ((newChainPath === 'mainnet' && !isOnMainnetRoute) ||
+            (newChainPath === 'sepolia' && !isOnSepoliaRoute)) {
           router.push(`/${newChainPath}/dashboard`);
 
-          // Optionally reload to ensure fresh data
           setTimeout(() => {
             window.location.reload();
           }, 100);
@@ -596,18 +580,37 @@ export default function Navbar() {
     <nav className={`w-full sticky top-0 z-40`} style={{ backgroundColor: isHomePage ? '#1A1A1A' : 'white' }}>
       <NavContainer>
         <div className="flex justify-between items-center py-5">
-          <Link href="/" className="no-underline">
-            <Image 
-              src={isHomePage ? "/companeon_symbol_square.png" : "/companeon_symbol_square.png"}
+          <Link href="/" className="no-underline flex items-center gap-2">
+            <Image
+              src={isHomePage ? "/companeon_symbol_white.png" : "/companeon_symbol_square.png"}
               alt="Companeon"
-              width={80}
-              height={32}
-              className="h-8 w-auto object-contain"
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain"
             />
+            <span className={`text-xl font-medium font-[family-name:var(--font-space-grotesk)] ${isHomePage ? 'text-white' : 'text-black'}`}>
+              Companeon
+            </span>
           </Link>
           
           {/* Desktop Navigation */}
           <div className={`hidden min-[950px]:flex items-center gap-6`}>
+            {isHomePage && (
+              <>
+                <button
+                  onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-lg transition-colors text-white/80 hover:text-white bg-transparent border-none cursor-pointer"
+                >
+                  How it works
+                </button>
+                <button
+                  onClick={() => document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="text-lg transition-colors text-white/80 hover:text-white bg-transparent border-none cursor-pointer"
+                >
+                  FAQs
+                </button>
+              </>
+            )}
             <a
               href="https://github.com/richardjaee/companeon-ai"
               target="_blank"
@@ -616,13 +619,16 @@ export default function Navbar() {
             >
               GitHub
             </a>
-            <Link
-              href="/base/dashboard"
-              className={`text-lg transition-colors ${isHomePage ? 'text-white/80 hover:text-white' : 'text-black hover:opacity-75'}`}
-            >
-              Launch app
-            </Link>
-            {isConnected && address && <WalletButton />}
+            {isConnected && address ? (
+              <WalletButton />
+            ) : (
+              <Link
+                href="/mainnet/dashboard"
+                className={`text-lg transition-colors ${isHomePage ? 'text-white/80 hover:text-white' : 'text-black hover:opacity-75'}`}
+              >
+                Launch app
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -664,14 +670,17 @@ export default function Navbar() {
           <NavContainer>
             {/* Header with close button */}
             <div className="flex justify-between items-center py-5 border-b border-gray-200">
-              <Link href="/" className="no-underline">
-                <Image 
+              <Link href="/" className="no-underline flex items-center gap-2">
+                <Image
                   src="/companeon_symbol_square.png"
                   alt="Companeon"
-                  width={70}
-                  height={28}
-                  className="h-7 w-auto object-contain"
+                  width={32}
+                  height={32}
+                  className="h-8 w-8 object-contain"
                 />
+                <span className="text-lg font-medium font-[family-name:var(--font-space-grotesk)] text-black">
+                  Companeon
+                </span>
               </Link>
               <button
                 onClick={() => setIsMobileMenuOpen(false)}
@@ -697,6 +706,28 @@ export default function Navbar() {
             {/* Menu Content */}
             <div className="pt-4 pb-8">
               <div className="space-y-1">
+                {isHomePage && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setTimeout(() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                      }}
+                      className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-lg"
+                    >
+                      How it works
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsMobileMenuOpen(false);
+                        setTimeout(() => document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                      }}
+                      className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-lg"
+                    >
+                      FAQs
+                    </button>
+                  </>
+                )}
                 <a
                   href="https://github.com/richardjaee/companeon-ai"
                   target="_blank"
@@ -710,7 +741,7 @@ export default function Navbar() {
                   GitHub
                 </a>
                 <Link
-                  href="/base/dashboard"
+                  href="/mainnet/dashboard"
                   onClick={() => setIsMobileMenuOpen(false)}
                   className="w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 flex items-center gap-3 text-lg"
                 >

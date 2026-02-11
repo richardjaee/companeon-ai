@@ -2291,10 +2291,10 @@ export default function CompaneonChatInterface({
                       </div>
                       {msg.transactionData?.txHash && (
                         <button
-                          onClick={() => window.open(`https://basescan.org/tx/${msg.transactionData.txHash}`, '_blank')}
+                          onClick={() => window.open(`${config.blockExplorer}/tx/${msg.transactionData.txHash}`, '_blank')}
                           className="w-full h-[42px] px-6 bg-white border-2 border-[#AD29FF] text-[#AD29FF] rounded-[42px] hover:bg-gray-50 transition-colors font-bold text-sm"
                         >
-                          View on Basescan
+                          View on Explorer
                         </button>
                       )}
                     </div>
