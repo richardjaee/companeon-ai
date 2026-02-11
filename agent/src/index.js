@@ -23,6 +23,34 @@ import { FirestoreSessionStore } from './memory/FirestoreSessionStore.js';
 import { registerWalletTools } from './tools/definitions/wallet-index.js';
 import { buildSystemPrompt } from './agent/wallet-prompts.js';
 
+// Credit system - direct Firestore access (shared project with API service)
+import admin from 'firebase-admin';
+
+// Ensure Firebase Admin is initialized (FirestoreSessionStore does this too,
+// but this is safe to call if already initialized)
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+const creditsDb = admin.firestore();
+const CREDITS_COLLECTION = 'wallet_credits';
+
+async function checkCredits(walletAddress) {
+  const wallet = walletAddress.toLowerCase();
+  const doc = await creditsDb.collection(CREDITS_COLLECTION).doc(wallet).get();
+  if (!doc.exists) return 0;
+  const data = doc.data();
+  return (data.totalCredits || 0) - (data.usedCredits || 0);
+}
+
+async function deductCredit(walletAddress) {
+  const wallet = walletAddress.toLowerCase();
+  const docRef = creditsDb.collection(CREDITS_COLLECTION).doc(wallet);
+  await docRef.update({
+    usedCredits: admin.firestore.FieldValue.increment(1),
+    updatedAt: Date.now()
+  });
+}
+
 // ============================================================================
 // Setup
 // ============================================================================
@@ -250,9 +278,30 @@ app.post('/sessions/:id/messages/stream', async (req, res) => {
   const { setRequestChainId, clearRequestChainId, getChainConfig } = await import('./lib/chainConfig.js');
   
   // Set chain context for this request (affects all chain-aware functions)
-  const effectiveChainId = chainId || 8453; // Default to Base
+  const effectiveChainId = chainId || 1;
   setRequestChainId(effectiveChainId);
   logger.info('request_chain_context', { sessionId, chainId: effectiveChainId, chainName: getChainConfig().name });
+
+  // Credit check: verify wallet has remaining credits before running agent
+  if (walletAddress) {
+    try {
+      const remaining = await checkCredits(walletAddress);
+      if (remaining <= 0) {
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.flushHeaders?.();
+        const writeErr = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+        writeErr({ type: 'error', code: 'NO_CREDITS', message: 'No credits remaining. Purchase more credits to continue using the AI assistant.' });
+        writeErr({ type: 'done', result: { plan: 'no_credits' } });
+        res.end();
+        return;
+      }
+    } catch (creditError) {
+      logger.warn('credit_check_failed', { walletAddress, error: creditError.message });
+      // Allow request to proceed if credit check fails (fail-open)
+    }
+  }
 
   // Ensure session exists (Firestore - async)
   await sessionStore.ensure(sessionId);
@@ -350,6 +399,15 @@ app.post('/sessions/:id/messages/stream', async (req, res) => {
       context,
       onEvent: write
     });
+
+    // Deduct one credit for successful agent response
+    if (walletAddress) {
+      try {
+        await deductCredit(walletAddress);
+      } catch (deductError) {
+        logger.warn('credit_deduct_failed', { walletAddress, error: deductError.message });
+      }
+    }
 
     // Save assistant response to history with tool context (Firestore - async)
     if (result.response) {
@@ -463,7 +521,7 @@ app.post('/tools/:name', async (req, res) => {
   
   // Extract chainId from body and set context
   const { chainId, ...toolParams } = req.body || {};
-  const effectiveChainId = chainId || 8453; // Default to Base
+  const effectiveChainId = chainId || 1;
   setRequestChainId(effectiveChainId);
 
   try {
@@ -510,7 +568,7 @@ app.post('/tasks', async (req, res) => {
   const { setRequestChainId, clearRequestChainId, getChainConfig } = await import('./lib/chainConfig.js');
   
   // Set chain context for this request
-  const effectiveChainId = chainId ?? context.chainId ?? 8453; // Default to Base
+  const effectiveChainId = chainId ?? context.chainId ?? 1;
   setRequestChainId(effectiveChainId);
   logger.info('task_chain_context', { chainId: effectiveChainId, chainName: getChainConfig().name });
 

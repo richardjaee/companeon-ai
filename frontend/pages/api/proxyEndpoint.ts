@@ -43,7 +43,12 @@ const endpointMap: { [key: string]: string | undefined } = {
   CHAT_HISTORY: `${API_SERVICE_URL}/chat/history`,
   CHAT_SESSION: `${API_SERVICE_URL}/chat/session`,
   CHAT_RESUME: `${API_SERVICE_URL}/chat/resume`,
-  TRANSACTIONS_HISTORY: `${API_SERVICE_URL}/transactions/history`
+  TRANSACTIONS_HISTORY: `${API_SERVICE_URL}/transactions/history`,
+
+  // Credits endpoints
+  CREDITS_BALANCE: `${API_SERVICE_URL}/credits/balance`,
+  CREDITS_GRANT_FREE: `${API_SERVICE_URL}/credits/grant-free`,
+  CREDITS_PURCHASE: `${API_SERVICE_URL}/credits/purchase`
 };
 
 interface ProxyRequestBody {

@@ -70,8 +70,6 @@ const CHAINS = {
     x402Network: 'eip155:1', // EIP-155 chain ID format for x402
     erc7715Supported: true,
   },
-
-}
 };
 
 // Default chain from environment

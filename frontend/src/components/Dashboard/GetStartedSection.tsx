@@ -3,23 +3,20 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import WalletConnectModal from '@/components/WalletConnectModal/WalletConnectModal';
-import AgentSettingsModal, { AgentControls } from '@/components/Chat/AgentSettingsModal';
+import PurchaseCreditsModal from './PurchaseCreditsModal';
 
 interface GetStartedSectionProps {
   onStartCoinSelection?: () => void;
   isSelectionMode?: boolean;
   isWalletConnected?: boolean;
+  onNavigateToAccount?: () => void;
 }
 
-export default function GetStartedSection({ onStartCoinSelection, isSelectionMode = false, isWalletConnected = true }: GetStartedSectionProps) {
+export default function GetStartedSection({ onStartCoinSelection, isSelectionMode = false, isWalletConnected = true, onNavigateToAccount }: GetStartedSectionProps) {
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
   const [showAIBanner, setShowAIBanner] = useState(true);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [agentControls, setAgentControls] = useState<AgentControls>({
-    autoTxMode: 'ask',
-    x402Mode: 'ask'
-  });
+  const [showPurchaseModal, setShowPurchaseModal] = useState(false);
 
   return (
     <>
@@ -50,7 +47,7 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
               <div className="mb-3">
                 <p className="text-sm text-gray-600">
                   {!isWalletConnected
-                    ? "Connect your wallet to view your cryptocurrency portfolio, NFT collection, and manage your permissions."
+                    ? "Connect your wallet to see your crypto and manage your agent permissions."
                     : "Learn how to set agent permissions."
                   }
                 </p>
@@ -85,7 +82,7 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
           </div>
           )}
 
-          {/* Assistant Setup Card */}
+          {/* Credits Card */}
           {showAIBanner && (
             <div className="bg-green-50 rounded-lg shadow-sm relative">
               {/* Close button */}
@@ -100,22 +97,28 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
             <div className="p-4 pr-14">
               <div className="mb-1">
                 <h4 className="text-base font-medium">
-                  Set up AI assistant settings
+                  Get AI prompts
                 </h4>
               </div>
 
               <div className="mb-3">
                 <p className="text-sm text-gray-600">
-                  Customize transaction settings and paid API capabilities.
+                  You start with 20 free credits. Purchase more anytime with ETH or USDC.
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => setShowSettingsModal(true)}
+                  onClick={() => setShowPurchaseModal(true)}
+                  className="px-4 py-2 text-sm border bg-white border-gray-300 text-gray-700 hover:bg-gray-50 rounded-[4px] transition-colors"
+                >
+                  Buy Credits
+                </button>
+                <button
+                  onClick={() => onNavigateToAccount?.()}
                   className="text-sm font-medium text-black hover:text-gray-700 transition-colors underline"
                 >
-                  Set up
+                  View usage
                 </button>
               </div>
             </div>
@@ -131,14 +134,9 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
         onClose={() => setShowWalletModal(false)}
       />
 
-      <AgentSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        controls={agentControls}
-        onSave={(newControls) => {
-          setAgentControls(newControls);
-          
-        }}
+      <PurchaseCreditsModal
+        isOpen={showPurchaseModal}
+        onClose={() => setShowPurchaseModal(false)}
       />
     </>
   );

@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { PaperAirplaneIcon, XMarkIcon, Cog6ToothIcon, ClockIcon, PlusIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline';
+import { PaperAirplaneIcon, XMarkIcon, ClockIcon, PlusIcon, ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
-import AgentSettingsModal, { AgentControls } from './AgentSettingsModal';
+import { AgentControls } from './AgentSettingsModal';
 import { grantERC7715Permissions, registerWalletAgent, type PermissionProposal } from '@/lib/smartAccount/grantPermissions';
 import { ethers } from 'ethers';
 import { useWallet } from '@/hooks/useWallet';
@@ -252,7 +252,6 @@ export default function CompaneonChatInterface({
     autoTxMode: 'ask',
     x402Mode: 'ask'
   });
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const isStreamActiveRef = useRef(false); // Track if there's an active SSE stream
   const [isTyping, setIsTyping] = useState(false);
@@ -2907,13 +2906,6 @@ export default function CompaneonChatInterface({
             className="flex-1 px-3 text-sm border border-gray-300 rounded-[4px] focus:outline-none focus:ring-2 focus:ring-[#AD29FF] disabled:bg-gray-100 resize-none overflow-hidden min-h-[42px] max-h-[200px]"
             style={{ height: 'auto', lineHeight: '26px', paddingTop: '8px', paddingBottom: '8px' }}
           />
-          <button
-            onClick={() => setShowSettingsModal(true)}
-            className="px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-[4px] transition-colors"
-            title="Agent Settings"
-          >
-            <Cog6ToothIcon className="h-5 w-5" />
-          </button>
           {isStreamActive ? (
             <button
               onClick={stopStream}
@@ -2935,17 +2927,6 @@ export default function CompaneonChatInterface({
           )}
         </div>
       </div>
-
-      {/* Agent Settings Modal */}
-      <AgentSettingsModal
-        isOpen={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        controls={agentControls}
-        onSave={(newControls) => {
-          setAgentControls(newControls);
-          
-        }}
-      />
 
       </div>
     </>

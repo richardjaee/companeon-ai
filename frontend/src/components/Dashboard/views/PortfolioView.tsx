@@ -28,7 +28,7 @@ const CryptoBalance = dynamic(() => import('@/app/[chain]/portfolio/components/c
   ssr: false
 });
 
-export default function PortfolioView() {
+export default function PortfolioView({ onNavigateToAccount }: { onNavigateToAccount?: () => void }) {
   const { config } = useChain();
   const [companeonContractAddress, setCompaneonContractAddress] = useState<string | null>(null);
   const [isCoinSectionOpen, setIsCoinSectionOpen] = useState(true);
@@ -923,6 +923,7 @@ export default function PortfolioView() {
                   }}
                   isSelectionMode={isTokenSelectionMode}
                   isWalletConnected={isConnected}
+                  onNavigateToAccount={onNavigateToAccount}
                 />
               </div>
 
