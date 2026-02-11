@@ -279,6 +279,9 @@ export default function HomePage() {
         </div>
       </div>
 
+      {/* Tweet Recognition Section */}
+      <TweetSection />
+
       {/* Problem Statement Section */}
       <div className="bg-[#AD29FF]" style={{ paddingTop: '96px', paddingBottom: '144px' }}>
         <Container>
@@ -291,31 +294,31 @@ export default function HomePage() {
           <div className="w-full max-w-5xl mx-auto">
             <div className="flex flex-col gap-8">
               <div className="bg-white border border-gray-200 rounded-lg p-8 w-full text-center">
-                <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">12+</h3>
+                <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">8+</h3>
                 <p className="text-lg text-black font-semibold">
-                  Steps to execute a simple swap across most DeFi apps.
+                  Steps to execute a single token swap on Uniswap.
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">73%</h3>
+                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">$3.4B</h3>
                   <p className="text-lg text-black font-semibold">
-                    Of users find DeFi interfaces confusing and intimidating.
+                    In ETH lost forever due to user error like wrong addresses.
                   </p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">5+</h3>
+                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">3+</h3>
                   <p className="text-lg text-black font-semibold">
-                    Different apps needed for basic portfolio management.
+                    Apps needed to swap, verify, and track a single transaction.
                   </p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
                   <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">0</h3>
                   <p className="text-lg text-black font-semibold">
-                    Solutions that let you trade by simply asking in plain English.
+                    Undo buttons. Every on-chain action is irreversible.
                   </p>
                 </div>
               </div>
@@ -415,9 +418,6 @@ export default function HomePage() {
         isLoading={isLoading}
         isConnected={isConnected}
       />
-
-      {/* Tweet Recognition Section */}
-      <TweetSection />
 
       {/* FAQ Section */}
       <div id="faqs">

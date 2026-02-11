@@ -19,27 +19,29 @@ const GoldCheckmark = () => (
 const TWEETS = [
   {
     id: '2014352928941674728',
-    text: 'Best Integration - New Project\n\n1st Place - Companeon\n2nd Place - Echelon\n3rd Place - ShoehornFi',
+    text: '\u{1F31F} Best Integration - New Project \u{1F31F}\n\n**1st Place - Companeon**\nhackquest.io/projects/MetaM\u2026',
     date: '7:02 AM \u00b7 Jan 22, 2026',
   },
   {
     id: '2017311922928914791',
-    text: '\u201cThis is what makes Advanced Permissions super powerful\u201d\n\n@richardjaey showcased Companeon, a conversational AI agent for crypto wallets, during the January @MetaMaskDev Community Call.',
+    text: '\u201cThis is what makes Advanced Permissions super powerful\u201d \u{1F98A}\n\n@richardjaey showcased Companeon, a conversational AI agent for crypto wallets, during the January @MetaMaskDev Community Call.',
     date: '11:00 AM \u00b7 Jan 30, 2026',
   },
 ];
 
 function TweetText({ text }: { text: string }) {
-  const parts = text.split(/(@\w+)/g);
+  const parts = text.split(/(@\w+|hackquest\.io\/\S+|\*\*[^*]+\*\*)/g);
   return (
     <p className="text-[15px] leading-[22px] text-[#0f1419] whitespace-pre-line">
-      {parts.map((part, i) =>
-        part.startsWith('@') ? (
-          <span key={i} className="text-[#1d9bf0] hover:underline">{part}</span>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
+      {parts.map((part, i) => {
+        if (part.startsWith('@') || part.startsWith('hackquest')) {
+          return <span key={i} className="text-[#1d9bf0]">{part}</span>;
+        }
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
     </p>
   );
 }

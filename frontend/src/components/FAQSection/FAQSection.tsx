@@ -12,7 +12,7 @@ const FAQSection = () => {
     },
     {
       title: "How do ERC-7715 permissions work?",
-      content: "ERC-7715 is a permission standard that lets you grant scoped, time-bound delegation to an agent. When you grant permissions, you set specific limits for each token (e.g. 0.1 ETH per day), a time frequency (hourly, daily, or weekly), and an expiration date.\n\nThe entire system is powered by MetaMask's Delegation Manager contract. These limits are enforced on-chain by smart contract enforcers built into the delegation framework. When the agent executes a transaction, the enforcer contract validates that the amount is within your limit and the permission hasn't expired. If the agent tries to exceed your limits, the transaction is rejected on-chain. This means even if the backend were compromised, your assets remain protected by the Delegation Manager contract."
+      content: "ERC-7715 is a permission standard that lets you grant scoped, time-bound delegation to an agent. To use it, you first upgrade your MetaMask wallet to a smart account via ERC-7702. This is a one-time on-chain transaction that enables advanced permission features.\n\nOnce upgraded, you can set specific limits for each token (e.g. 0.1 ETH per day), a time frequency (hourly, daily, or weekly), and an expiration date. The entire system is powered by MetaMask's Delegation Manager contract. These limits are enforced on-chain by smart contract enforcers built into the delegation framework. When the agent executes a transaction, the enforcer contract validates that the amount is within your limit and the permission hasn't expired. If the agent tries to exceed your limits, the transaction is rejected on-chain. This means even if the backend were compromised, your assets remain protected by the Delegation Manager contract."
     },
     {
       title: "Does Companeon have custody of my assets?",
@@ -23,8 +23,8 @@ const FAQSection = () => {
       content: "The agent can execute token swaps via Uniswap, transfer ETH and ERC-20 tokens to any address or ENS name, check your portfolio balances and real-time prices, analyze your on-chain transaction history, estimate gas costs across speed tiers, set up recurring automated transfers, check address security via GoPlus, and browse the web for market research.\n\nAll transaction-executing actions require either your confirmation (ask mode) or pre-authorized auto mode. Read-only operations like checking balances and getting quotes are always free."
     },
     {
-      title: "What chains are supported?",
-      content: "Companeon currently supports Ethereum Mainnet and Base with full ERC-7715 permission support. Sepolia testnet is also available for testing. The same conversational interface and permissions model works across all supported chains."
+      title: "What does Companeon support?",
+      content: "Companeon works with MetaMask, which natively supports the ERC-7715 permission standard. Transactions can be executed on Ethereum Mainnet, with Sepolia testnet available for testing."
     },
     {
       title: "How much does it cost?",

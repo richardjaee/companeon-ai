@@ -17,6 +17,7 @@
 @layer base {
   html {
     @apply text-black bg-white;
+    scroll-behavior: smooth;
     scrollbar-gutter: stable;
     overflow-x: hidden;
   }
