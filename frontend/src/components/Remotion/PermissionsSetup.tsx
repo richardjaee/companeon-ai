@@ -262,7 +262,6 @@ export const PermissionsSetup: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '40%', flexShrink: 0 }}>
             <TokenRow symbol="ETH" name="Ethereum" logo="/logos/eth-logo.png" selected={ethSelected} checked={ethChecked} />
             <TokenRow symbol="USDC" name="USD Coin" logo="/logos/usdc-logo.png" selected={usdcSelected} checked={usdcChecked} />
-            <TokenRow symbol="WBTC" name="Wrapped BTC" iconLetter="B" iconBg="#f09242" selected={false} checked={false} />
           </div>
 
           {/* Right Column - Form fields (always rendered, never unmounted) */}

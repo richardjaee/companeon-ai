@@ -166,8 +166,8 @@ export default function HomePage() {
             {/* Left side - Text */}
             <div className="w-full lg:w-[57.5%] text-center lg:text-left">
               <div className="leading-none">
-                <h1 className="text-white text-[36px] sm:text-[60px] mb-1 sm:mb-2 font-medium font-[family-name:var(--font-space-grotesk)]">Your AI agent for</h1>
-                <h1 className="text-white text-[36px] sm:text-[60px] font-medium font-[family-name:var(--font-space-grotesk)]">on-chain transactions</h1>
+                <h1 className="text-white text-[36px] sm:text-[60px] mb-1 sm:mb-2 font-medium font-[family-name:var(--font-space-grotesk)]">Your wallet&apos;s</h1>
+                <h1 className="text-white text-[36px] sm:text-[60px] font-medium font-[family-name:var(--font-space-grotesk)]">personal AI agent</h1>
               </div>
 
               <p className="text-gray-300 mt-4 sm:mt-4 mb-10 sm:mb-10 text-sm sm:text-2xl leading-relaxed mx-auto lg:mx-0" style={{ maxWidth: "500px" }}>
@@ -302,23 +302,23 @@ export default function HomePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">$3.4B</h3>
+                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">80%</h3>
                   <p className="text-lg text-black font-semibold">
-                    In ETH lost forever due to user error like wrong addresses.
+                    Of crypto theft in 2025 came from leaked private keys given to bots and services.
                   </p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">3+</h3>
+                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">$2.2B</h3>
                   <p className="text-lg text-black font-semibold">
-                    Apps needed to swap, verify, and track a single transaction.
+                    Drained through unlimited token approvals and excessive allowances in 2024.
                   </p>
                 </div>
 
                 <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
-                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">0</h3>
+                  <h3 className="text-[56px] font-medium text-black mb-2 leading-none font-[family-name:var(--font-space-grotesk)]">$6.3B</h3>
                   <p className="text-lg text-black font-semibold">
-                    Undo buttons. Every on-chain action is irreversible.
+                    Lost to smart contract exploits across DeFi protocols since 2024.
                   </p>
                 </div>
               </div>
@@ -430,7 +430,7 @@ export default function HomePage() {
           <div className="flex flex-col gap-12 items-center justify-center">
             <div className="w-full lg:w-2/3 text-center">
               <h2 className="text-4xl lg:text-[40px] font-semibold text-white mb-12 font-[family-name:var(--font-space-grotesk)]">
-                Stop navigating DeFi. Start talking to it.
+                Just talk to your wallet.
               </h2>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">

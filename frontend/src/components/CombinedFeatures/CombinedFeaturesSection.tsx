@@ -60,7 +60,7 @@ export default function CombinedFeaturesSection({
     {
       title: "Zero custody",
       icon: <Shield className="h-7 w-7" />,
-      description: "Your assets never leave your wallet. The agent executes transactions through ERC-7715 delegation, enforced on-chain by smart contract enforcers."
+      description: "Your assets never leave your wallet. The agent executes transactions through ERC-7715 delegation, enforced on-chain by MetaMask's Delegation contract."
     },
     {
       title: "Conversational execution",
@@ -73,9 +73,9 @@ export default function CombinedFeaturesSection({
       description: "Set per-token spending limits that auto-reset hourly, daily, or weekly. The agent cannot exceed your limits even if the backend is compromised."
     },
     {
-      title: "Recurring automation",
+      title: "Safe automation",
       icon: <RefreshCw className="h-7 w-7" />,
-      description: "Set up daily transfers, scheduled swaps, and automated DeFi operations. Sub-delegation lets specialized agents run tasks within your parent permissions."
+      description: "Schedule transfers, swaps, and DeFi operations through agent-to-agent subdelegation which never exceeds the limits you set."
     },
     {
       title: "Transparent reasoning",

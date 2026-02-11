@@ -429,7 +429,7 @@ export default function Navbar() {
           disabled={isLoading}
           className={`flex items-center gap-2 max-w-[200px] relative pl-0.5 pr-4 py-2 rounded-[20px] transition-all group`}
         >
-          <span className={`text-lg transition-colors ${isHomePage ? 'text-white/80 group-hover:text-white' : 'text-black group-hover:opacity-75'}`}>
+          <span className={`text-lg transition-colors ${isHomePage ? 'text-white group-hover:opacity-75' : 'text-black group-hover:opacity-75'}`}>
             {isLoading ? 'Connecting...' : 'Connect wallet'}
           </span>
         </button>
@@ -564,7 +564,7 @@ export default function Navbar() {
           disabled={isLoading}
           className={`flex items-center gap-2 max-w-[200px] relative pl-0.5 pr-4 py-2 rounded-[20px] transition-all group`}
         >
-          <span className={`text-lg transition-colors ${isHomePage ? 'text-white/80 group-hover:text-white' : 'text-black group-hover:opacity-75'}`}>
+          <span className={`text-lg transition-colors ${isHomePage ? 'text-white group-hover:opacity-75' : 'text-black group-hover:opacity-75'}`}>
             {isLoading
               ? 'Connecting...'
               : address
@@ -599,13 +599,13 @@ export default function Navbar() {
               <>
                 <button
                   onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-lg transition-colors text-white/80 hover:text-white bg-transparent border-none cursor-pointer"
+                  className="text-lg transition-colors text-white hover:opacity-75 bg-transparent border-none cursor-pointer"
                 >
                   How it works
                 </button>
                 <button
                   onClick={() => document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="text-lg transition-colors text-white/80 hover:text-white bg-transparent border-none cursor-pointer"
+                  className="text-lg transition-colors text-white hover:opacity-75 bg-transparent border-none cursor-pointer"
                 >
                   FAQs
                 </button>
@@ -615,7 +615,7 @@ export default function Navbar() {
               href="https://github.com/richardjaee/companeon-ai"
               target="_blank"
               rel="noopener noreferrer"
-              className={`text-lg transition-colors ${isHomePage ? 'text-white/80 hover:text-white' : 'text-black hover:opacity-75'}`}
+              className={`text-lg transition-colors ${isHomePage ? 'text-white hover:opacity-75' : 'text-black hover:opacity-75'}`}
             >
               GitHub
             </a>
@@ -624,7 +624,7 @@ export default function Navbar() {
             ) : (
               <Link
                 href="/mainnet/dashboard"
-                className={`text-lg transition-colors ${isHomePage ? 'text-white/80 hover:text-white' : 'text-black hover:opacity-75'}`}
+                className={`text-lg transition-colors ${isHomePage ? 'text-white hover:opacity-75' : 'text-black hover:opacity-75'}`}
               >
                 Launch app
               </Link>

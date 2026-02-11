@@ -1575,15 +1575,13 @@ export const MAINNET_TOKENS: Record<string, TokenData> = {
     categories: ['defi-protocols', 'infrastructure'],
     description: 'Cross-chain DeFi platform and multi-blockchain wallet ecosystem'
   },
-  /*
- '0xae7ab96520de3a18e5e111b5eaab095312d7fe84': { 
- symbol: 'stETH', 
- name: 'Liquid staked Ether 2.0',
- decimals: 18,
- categories: ['liquid-staking'],
- description: 'Liquid staking token representing staked ETH in the Lido protocol'
- },
- */
+  '0xae7ab96520de3a18e5e111b5eaab095312d7fe84': {
+    symbol: 'stETH',
+    name: 'Liquid staked Ether 2.0',
+    decimals: 18,
+    categories: ['liquid-staking'],
+    description: 'Liquid staking token representing staked ETH in the Lido protocol'
+  },
   '0xaea46a60368a7bd060eec7df8cba43b7ef41ad85': { 
     symbol: 'FET', 
     name: 'Fetch',

@@ -19,6 +19,26 @@ export default function Footer({ isHomePage = false }: FooterProps) {
             </div>
 
             <div className="flex flex-wrap justify-center gap-x-8 gap-y-4 mb-6">
+              <button
+                onClick={() => document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-gray-700 hover:text-[#AD29FF] transition-colors bg-transparent border-none cursor-pointer"
+              >
+                How it works
+              </button>
+              <button
+                onClick={() => document.getElementById('faqs')?.scrollIntoView({ behavior: 'smooth' })}
+                className="text-gray-700 hover:text-[#AD29FF] transition-colors bg-transparent border-none cursor-pointer"
+              >
+                FAQs
+              </button>
+              <a
+                href="https://github.com/richardjaee/companeon-ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-700 hover:text-[#AD29FF] transition-colors"
+              >
+                GitHub
+              </a>
               <Link href="/terms" className="text-gray-700 hover:text-[#AD29FF] transition-colors">
                 Terms
               </Link>

@@ -8,11 +8,11 @@ const FAQSection = () => {
   const questions = [
     {
       title: "What is Companeon?",
-      content: "Companeon is a wallet-native AI agent that converts conversational prompts into on-chain transactions. Instead of navigating multiple DeFi apps, you simply tell the agent what you want to do in plain English, like \"swap 50 USDC to ETH\" or \"send 0.5 ETH to vitalik.eth\", and it handles the execution directly from your wallet.\n\nThe agent uses ERC-7715 Advanced Permissions to operate within scoped spending limits you define. Your assets never leave your wallet, and the agent cannot exceed the boundaries you set."
+      content: "Companeon is a wallet-native AI agent that converts conversational prompts into on-chain transactions. Instead of navigating multiple DeFi apps, you simply tell the agent what you want to do in plain English, like \"swap 50 USDC to ETH\" or \"send 0.5 ETH to vitalik.eth\", and the agent intelligently uses its tools to find the best swap route across Uniswap liquidity pools, estimate gas costs, resolve ENS names, run recipient security checks, and preview the full transaction before you confirm.\n\nThe agent uses ERC-7715 Advanced Permissions to operate within scoped spending limits you define. Your assets never leave your wallet, and the agent cannot exceed the boundaries you set."
     },
     {
       title: "How do ERC-7715 permissions work?",
-      content: "ERC-7715 is a permission standard that lets you grant scoped, time-bound delegation to an agent. To use it, you first upgrade your MetaMask wallet to a smart account via ERC-7702. This is a one-time on-chain transaction that enables advanced permission features.\n\nOnce upgraded, you can set specific limits for each token (e.g. 0.1 ETH per day), a time frequency (hourly, daily, or weekly), and an expiration date. The entire system is powered by MetaMask's Delegation Manager contract. These limits are enforced on-chain by smart contract enforcers built into the delegation framework. When the agent executes a transaction, the enforcer contract validates that the amount is within your limit and the permission hasn't expired. If the agent tries to exceed your limits, the transaction is rejected on-chain. This means even if the backend were compromised, your assets remain protected by the Delegation Manager contract."
+      content: "ERC-7715 is a permission standard that lets you grant scoped, time-bound delegation to an agent. To use it, you first upgrade your MetaMask wallet to a smart account via ERC-7702. This is a one-time on-chain transaction that enables advanced permission features.\n\nOnce upgraded, you can set specific limits for each token (e.g. 0.1 ETH per day), a time frequency (hourly, daily, or weekly), and an expiration date. The entire system is powered by MetaMask's Delegation Manager contract which enforces spending permissions on-chain at no extra cost. If the agent tries to exceed your spending limits, the transaction is rejected on-chain. Everything is executed and enforced directly within your wallet, so there's no external custody, private key exposure, or unlimited approval risk."
     },
     {
       title: "Does Companeon have custody of my assets?",
@@ -20,15 +20,15 @@ const FAQSection = () => {
     },
     {
       title: "What can the AI agent do?",
-      content: "The agent can execute token swaps via Uniswap, transfer ETH and ERC-20 tokens to any address or ENS name, check your portfolio balances and real-time prices, analyze your on-chain transaction history, estimate gas costs across speed tiers, set up recurring automated transfers, check address security via GoPlus, and browse the web for market research.\n\nAll transaction-executing actions require either your confirmation (ask mode) or pre-authorized auto mode. Read-only operations like checking balances and getting quotes are always free."
+      content: "The agent can execute token swaps, check gas prices, analyze on-chain history, copy trade, transfer tokens, set up recurring automated operations, and stake. Every agent has access to a full set of tools including integrations to powerful APIs like Alchemy, CoinMarketCap, 0x, GoPlus Security, web browsing, and more, all included at no extra cost."
     },
     {
-      title: "What does Companeon support?",
-      content: "Companeon works with MetaMask, which natively supports the ERC-7715 permission standard. Transactions can be executed on Ethereum Mainnet, with Sepolia testnet available for testing."
+      title: "What chains and wallets does Companeon support?",
+      content: "Companeon works with MetaMask, which natively supports the ERC-7715 permission standard. Transactions can be executed on Ethereum Mainnet, with Sepolia testnet available for testing. We are working to add more chain support, and will add additional wallet providers once ERC-7715 is more widely supported."
     },
     {
       title: "How much does it cost?",
-      content: "Companeon does not charge any platform fees for swaps, transfers, or portfolio management. You only pay standard network gas fees for the transactions the agent executes on your behalf.\n\nThe only cost beyond gas is LLM credits, which cover the AI reasoning behind each conversation. Credits are affordable and transparent, so you always know what you're paying for."
+      content: "Companeon does not charge any additional fees for any transaction executed through our agent and we also sponsor all gas fees for agent transactions.  We only charge for LLM credits, which cover the AI reasoning behind each conversation. Credits come in at 4.99 USDC for 200 credits and can be purchased directly with your wallet. No credit card, subscriptions, or emails required."
     }
   ];
 

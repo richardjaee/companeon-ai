@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Container from '@/components/Layout/Container';
 
 const PROFILE_IMG = 'https://pbs.twimg.com/profile_images/1903094269398687744/uYBqOz3H_normal.jpg';
@@ -47,6 +48,8 @@ function TweetText({ text }: { text: string }) {
 }
 
 export default function TweetSection() {
+  const [isLinkHovered, setIsLinkHovered] = useState(false);
+
   return (
     <div className="bg-gray-50 py-24">
       <Container>
@@ -54,6 +57,32 @@ export default function TweetSection() {
           <p className="text-[32px] lg:text-[42px] max-w-5xl mx-auto font-medium text-black leading-tight font-[family-name:var(--font-space-grotesk)]">
             Trusted by MetaMask
           </p>
+          <a
+            href="https://www.hackquest.io/projects/MetaMask-Advanced-Permissions-Dev-Cook-Off-Companeon"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-[#AD29FF] font-medium hover:text-[#8A1FCC] transition-colors mt-4"
+            onMouseEnter={() => setIsLinkHovered(true)}
+            onMouseLeave={() => setIsLinkHovered(false)}
+          >
+            Find our winning submission on HackQuest
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              className="ml-2 transition-transform duration-200"
+              style={{ transform: isLinkHovered ? 'translateX(3px)' : 'translateX(0)' }}
+            >
+              <path
+                d="M5 12h14M15 6l6 6-6 6"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </a>
         </div>
         <div className="flex flex-col md:flex-row gap-6 justify-center items-stretch max-w-3xl mx-auto">
           {TWEETS.map((tweet) => (

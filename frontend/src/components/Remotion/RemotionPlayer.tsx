@@ -15,7 +15,7 @@ const COMPOSITION_CONFIG: Record<CompositionId, { durationInFrames: number; widt
   'permissions-setup': { durationInFrames: 270, width: 438, height: 438 },
   'permissions-grant': { durationInFrames: 300, width: 438, height: 438 },
   'agent-chat': { durationInFrames: 450, width: 438, height: 438 },
-  'hero-demo': { durationInFrames: 600, width: 960, height: 540 },
+  'hero-demo': { durationInFrames: 750, width: 960, height: 540 },
 };
 
 const RemotionPlayer: React.FC<RemotionPlayerProps> = ({ composition }) => {
