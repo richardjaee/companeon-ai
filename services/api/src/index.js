@@ -71,25 +71,21 @@ async function getViemChainObject(chainId) {
   switch (chainId) {
     case 11155111:
       return chains.sepolia;
-    case 8453:
-      return chains.base;
     case 1:
       return chains.mainnet;
     default:
-      return chains.base;
+      return chains.mainnet;
   }
 }
 
 function getRpcUrl(chainId) {
   switch (chainId) {
-    case 8453:
-      return process.env.BASE_RPC_URL || 'https://mainnet.base.org';
     case 1:
       return process.env.ETH_RPC_URL || 'https://rpc.ankr.com/eth';
     case 11155111:
       return process.env.RPC_URL || 'https://ethereum-sepolia-rpc.publicnode.com';
     default:
-      return process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+      return process.env.ETH_RPC_URL || 'https://rpc.ankr.com/eth';
   }
 }
 
@@ -401,7 +397,7 @@ app.post('/wallet/register-agent', async (req, res) => {
       permissionsContext,
       allPermissionContexts,
       delegationManager,
-      chainId = 8453,
+      chainId = 1,
       expiresAt,
       smartAccountAddress,
       accountMeta,
@@ -523,7 +519,7 @@ app.get('/wallet/status', async (req, res) => {
 app.get('/wallet/limits', async (req, res) => {
   try {
     const walletAddress = req.query.wallet || req.query.walletAddress;
-    const chainId = parseInt(req.query.chainId) || 8453;
+    const chainId = parseInt(req.query.chainId) || 1;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'wallet query param required' });
@@ -797,8 +793,7 @@ async function getTokenPrices(db, symbols) {
 
 // Alchemy RPC URLs by chain
 const ALCHEMY_URLS = {
-  8453: process.env.ALCHEMY_RPC_URL || 'https://base-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY,
-  1: 'https://eth-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY,
+  1: process.env.ALCHEMY_RPC_URL || 'https://eth-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY,
   11155111: process.env.SEPOLIA_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY
 };
 
@@ -807,13 +802,13 @@ const ALCHEMY_URLS = {
  */
 app.post('/assets/tokens', async (req, res) => {
   try {
-    const { walletAddress, chainId = 8453 } = req.body;
+    const { walletAddress, chainId = 1 } = req.body;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'walletAddress required' });
     }
 
-    const alchemyUrl = ALCHEMY_URLS[chainId] || ALCHEMY_URLS[8453];
+    const alchemyUrl = ALCHEMY_URLS[chainId] || ALCHEMY_URLS[1];
 
     // Fetch ETH balance
     const ethResponse = await fetch(alchemyUrl, {
@@ -918,13 +913,13 @@ app.post('/assets/tokens', async (req, res) => {
  */
 app.post('/assets/nfts', async (req, res) => {
   try {
-    const { walletAddress, chainId = 8453 } = req.body;
+    const { walletAddress, chainId = 1 } = req.body;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'walletAddress required' });
     }
 
-    const alchemyUrl = ALCHEMY_URLS[chainId] || ALCHEMY_URLS[8453];
+    const alchemyUrl = ALCHEMY_URLS[chainId] || ALCHEMY_URLS[1];
     const nftUrl = `${alchemyUrl}/getNFTs?owner=${walletAddress}&pageSize=50`;
 
     const nftResponse = await fetch(nftUrl, {
@@ -1208,7 +1203,7 @@ app.get('/chat/session/:startedAt', async (req, res) => {
  */
 app.post('/chat/resume', async (req, res) => {
   try {
-    const { walletAddress, startedAt, chainId = 8453 } = req.body;
+    const { walletAddress, startedAt, chainId = 1 } = req.body;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'walletAddress required' });
@@ -1327,6 +1322,271 @@ app.get('/transactions/history', async (req, res) => {
 });
 
 // ========================================
+// CREDITS ENDPOINTS
+// ========================================
+
+const CREDITS_COLLECTION = 'wallet_credits';
+
+/**
+ * GET /credits/balance - Get credit balance for a wallet
+ */
+app.get('/credits/balance', async (req, res) => {
+  try {
+    const walletAddress = req.query.wallet || req.query.walletAddress;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'wallet query param required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const doc = await db.collection(CREDITS_COLLECTION).doc(wallet).get();
+
+    if (!doc.exists) {
+      return res.json({
+        credits: 0,
+        used: 0,
+        remaining: 0,
+        freeCreditsGranted: false
+      });
+    }
+
+    const data = doc.data();
+    const totalCredits = data.totalCredits || 0;
+    const usedCredits = data.usedCredits || 0;
+
+    res.json({
+      credits: totalCredits,
+      used: usedCredits,
+      remaining: totalCredits - usedCredits,
+      freeCreditsGranted: data.freeCreditsGranted || false
+    });
+  } catch (error) {
+    console.error('credits/balance error:', error);
+    res.status(500).json({ error: 'Failed to get credit balance' });
+  }
+});
+
+/**
+ * POST /credits/grant-free - Grant 20 free credits to a new wallet
+ */
+app.post('/credits/grant-free', async (req, res) => {
+  try {
+    const { walletAddress } = req.body;
+
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'walletAddress required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const docRef = db.collection(CREDITS_COLLECTION).doc(wallet);
+    const doc = await docRef.get();
+
+    if (doc.exists && doc.data()?.freeCreditsGranted) {
+      return res.status(400).json({ error: 'Free credits already granted' });
+    }
+
+    const now = Date.now();
+
+    if (doc.exists) {
+      // Document exists but free credits not yet granted
+      const data = doc.data();
+      await docRef.update({
+        totalCredits: (data.totalCredits || 0) + 20,
+        freeCreditsGranted: true,
+        updatedAt: now
+      });
+    } else {
+      // Create new document
+      await docRef.set({
+        walletAddress: wallet,
+        totalCredits: 20,
+        usedCredits: 0,
+        freeCreditsGranted: true,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    console.log(`credits/grant-free: Granted 20 free credits to ${wallet.slice(0, 10)}`);
+
+    res.json({
+      success: true,
+      credits: doc.exists ? (doc.data().totalCredits || 0) + 20 : 20,
+      remaining: doc.exists ? (doc.data().totalCredits || 0) + 20 - (doc.data().usedCredits || 0) : 20
+    });
+  } catch (error) {
+    console.error('credits/grant-free error:', error);
+    res.status(500).json({ error: 'Failed to grant free credits' });
+  }
+});
+
+/**
+ * POST /credits/purchase - Verify USDC payment and grant credits
+ */
+app.post('/credits/purchase', async (req, res) => {
+  try {
+    const { walletAddress, txHash, chainId, paymentType = 'USDC' } = req.body;
+
+    if (!walletAddress || !txHash || !chainId) {
+      return res.status(400).json({ error: 'walletAddress, txHash, and chainId required' });
+    }
+
+    if (!['USDC', 'ETH'].includes(paymentType)) {
+      return res.status(400).json({ error: 'paymentType must be USDC or ETH' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const treasuryAddress = process.env.TREASURY_ADDRESS;
+
+    if (!treasuryAddress) {
+      console.error('TREASURY_ADDRESS not configured');
+      return res.status(500).json({ error: 'Treasury not configured' });
+    }
+
+    // Check for replay: ensure txHash hasn't been used before
+    const purchasesRef = db.collection(CREDITS_COLLECTION).doc(wallet).collection('purchases');
+    const existingPurchase = await purchasesRef.doc(txHash.toLowerCase()).get();
+    if (existingPurchase.exists) {
+      return res.status(400).json({ error: 'Transaction already used for credit purchase' });
+    }
+
+    // Verify the transaction on-chain
+    const rpcUrl = getRpcUrl(chainId);
+    const provider = new ethers.JsonRpcProvider(rpcUrl);
+    const receipt = await provider.getTransactionReceipt(txHash);
+
+    if (!receipt) {
+      return res.status(400).json({ error: 'Transaction not found or not yet confirmed' });
+    }
+
+    if (receipt.status !== 1) {
+      return res.status(400).json({ error: 'Transaction failed on-chain' });
+    }
+
+    const PURCHASE_PRICE_USD = 4.99;
+    let verifiedAmountDisplay = '';
+
+    if (paymentType === 'ETH') {
+      // Verify native ETH transfer to treasury
+      const tx = await provider.getTransaction(txHash);
+      if (!tx) {
+        return res.status(400).json({ error: 'Transaction data not found' });
+      }
+
+      if (tx.to?.toLowerCase() !== treasuryAddress.toLowerCase()) {
+        return res.status(400).json({ error: 'ETH was not sent to the treasury address' });
+      }
+
+      // Get current ETH price from cache
+      const prices = await getTokenPrices(db, ['ETH']);
+      const ethPrice = prices.ETH?.usd;
+      if (!ethPrice || ethPrice <= 0) {
+        return res.status(500).json({ error: 'Unable to fetch ETH price for verification' });
+      }
+
+      // Calculate minimum ETH required with 2% slippage tolerance
+      const minimumUsd = PURCHASE_PRICE_USD * 0.98;
+      const minimumEth = minimumUsd / ethPrice;
+      const minimumWei = BigInt(Math.floor(minimumEth * 1e18));
+
+      const sentWei = tx.value;
+      if (sentWei < minimumWei) {
+        const sentEth = Number(sentWei) / 1e18;
+        const sentUsd = (sentEth * ethPrice).toFixed(2);
+        return res.status(400).json({
+          error: `Insufficient payment. Expected ~$${PURCHASE_PRICE_USD} worth of ETH (~${minimumEth.toFixed(6)} ETH at $${ethPrice.toFixed(2)}), got ${sentEth.toFixed(6)} ETH (~$${sentUsd})`
+        });
+      }
+
+      verifiedAmountDisplay = `${(Number(sentWei) / 1e18).toFixed(6)} ETH`;
+
+    } else {
+      // Verify USDC transfer via Transfer event
+      const USDC_ADDRESSES = {
+        1: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',       // Ethereum Mainnet
+        8453: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',     // Base
+        11155111: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // Sepolia
+        84532: '0x036CbD53842c5426634e7929541eC2318f3dCF7e'      // Base Sepolia
+      };
+
+      const usdcAddress = USDC_ADDRESSES[chainId];
+      if (!usdcAddress) {
+        return res.status(400).json({ error: `Unsupported chain ${chainId} for USDC payments` });
+      }
+
+      const transferTopic = ethers.id('Transfer(address,address,uint256)');
+      const transferLog = receipt.logs.find(log =>
+        log.address.toLowerCase() === usdcAddress.toLowerCase() &&
+        log.topics[0] === transferTopic &&
+        log.topics.length >= 3 &&
+        ('0x' + log.topics[2].slice(26)).toLowerCase() === treasuryAddress.toLowerCase()
+      );
+
+      if (!transferLog) {
+        return res.status(400).json({ error: 'No USDC transfer to treasury found in transaction' });
+      }
+
+      const transferAmount = BigInt(transferLog.data);
+      const minimumAmount = BigInt(4990000); // $4.99 with 6 decimals
+
+      if (transferAmount < minimumAmount) {
+        return res.status(400).json({
+          error: `Insufficient payment. Expected at least 4.99 USDC, got ${Number(transferAmount) / 1e6} USDC`
+        });
+      }
+
+      verifiedAmountDisplay = `${Number(transferAmount) / 1e6} USDC`;
+    }
+
+    // Grant credits
+    const now = Date.now();
+    const docRef = db.collection(CREDITS_COLLECTION).doc(wallet);
+    const doc = await docRef.get();
+
+    if (doc.exists) {
+      const data = doc.data();
+      await docRef.update({
+        totalCredits: (data.totalCredits || 0) + 100,
+        updatedAt: now
+      });
+    } else {
+      await docRef.set({
+        walletAddress: wallet,
+        totalCredits: 100,
+        usedCredits: 0,
+        freeCreditsGranted: false,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
+
+    // Record the purchase to prevent replay
+    await purchasesRef.doc(txHash.toLowerCase()).set({
+      txHash: txHash.toLowerCase(),
+      amount: verifiedAmountDisplay,
+      paymentType,
+      creditsGranted: 100,
+      chainId,
+      verifiedAt: now
+    });
+
+    const updatedDoc = await docRef.get();
+    const updatedData = updatedDoc.data();
+
+    console.log(`credits/purchase: Granted 100 credits to ${wallet.slice(0, 10)} via ${paymentType} tx ${txHash.slice(0, 10)}`);
+
+    res.json({
+      success: true,
+      credits: updatedData.totalCredits,
+      remaining: updatedData.totalCredits - (updatedData.usedCredits || 0)
+    });
+  } catch (error) {
+    console.error('credits/purchase error:', error);
+    res.status(500).json({ error: 'Failed to verify purchase' });
+  }
+});
+
+// ========================================
 // AGENT SESSION ENDPOINTS (Legacy routes)
 // ========================================
 
@@ -1335,7 +1595,7 @@ app.get('/transactions/history', async (req, res) => {
  */
 app.post('/companeon/create-live-session', async (req, res) => {
   try {
-    const { walletAddress, chainId = 8453 } = req.body;
+    const { walletAddress, chainId = 1 } = req.body;
 
     if (!walletAddress) {
       return res.status(400).json({ error: 'walletAddress required' });
@@ -1347,6 +1607,31 @@ app.post('/companeon/create-live-session', async (req, res) => {
     // Check wallet delegation
     const walletDoc = await db.collection(WALLET_COLLECTION).doc(wallet).get();
     const hasDelegation = walletDoc.exists && walletDoc.data()?.delegationActive;
+
+    // Auto-grant free credits for new wallets
+    const creditsRef = db.collection(CREDITS_COLLECTION).doc(wallet);
+    const creditsDoc = await creditsRef.get();
+    if (!creditsDoc.exists || !creditsDoc.data()?.freeCreditsGranted) {
+      const now = Date.now();
+      if (creditsDoc.exists) {
+        const data = creditsDoc.data();
+        await creditsRef.update({
+          totalCredits: (data.totalCredits || 0) + 20,
+          freeCreditsGranted: true,
+          updatedAt: now
+        });
+      } else {
+        await creditsRef.set({
+          walletAddress: wallet,
+          totalCredits: 20,
+          usedCredits: 0,
+          freeCreditsGranted: true,
+          createdAt: now,
+          updatedAt: now
+        });
+      }
+      console.log(`Auto-granted 20 free credits to ${wallet.slice(0, 10)}`);
+    }
 
     // Create session in Firestore
     await db.collection('AgentSessions').doc(sessionId).set({
