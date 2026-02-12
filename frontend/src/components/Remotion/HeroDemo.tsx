@@ -605,7 +605,7 @@ export const HeroDemo: React.FC = () => {
                   </div>
                 )}
 
-                {/* Result card */}
+                {/* Result card - matches real chat UI */}
                 {showRes && (
                   <div style={{
                     display: 'flex', gap: 6, alignItems: 'flex-start',
@@ -613,35 +613,49 @@ export const HeroDemo: React.FC = () => {
                   }}>
                     <Avatar size={20} />
                     <div style={{
-                      border: `1px solid ${GRAY_200}`, borderRadius: 10,
-                      overflow: 'hidden', flex: 1,
+                      borderLeft: `2px solid ${GRAY_200}`,
+                      paddingLeft: 10, flex: 1,
                     }}>
-                      <div style={{ padding: '8px 10px' }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#111', marginBottom: 5 }}>Swap Summary</div>
-                        {RESULT_LINES.map((line, i) => (
-                          <div key={i} style={{ fontSize: 9, color: GRAY_600, lineHeight: 1.5 }}>{line}</div>
-                        ))}
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#111', marginBottom: 5 }}>Swap Summary</div>
+                      {RESULT_LINES.map((line, i) => (
+                        <div key={i} style={{ fontSize: 9, color: GRAY_600, lineHeight: 1.6 }}>{line}</div>
+                      ))}
+
+                      {/* Divider + confirm prompt */}
+                      <div style={{ height: 1, backgroundColor: GRAY_200, margin: '8px 0' }} />
+                      <div style={{ fontSize: 10, fontWeight: 600, color: '#111', marginBottom: 6 }}>Ready to send?</div>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{
+                          height: 22, paddingLeft: 10, paddingRight: 10,
+                          borderRadius: 4, border: `1px solid ${GRAY_300}`,
+                          backgroundColor: 'white', color: GRAY_700,
+                          fontSize: 8, fontWeight: 500,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          Not now
+                        </div>
+                        <div style={{
+                          height: 22, paddingLeft: 12, paddingRight: 12,
+                          borderRadius: 4, backgroundColor: PURPLE, color: 'white',
+                          fontSize: 8, fontWeight: 600,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transform: showSuccChat ? 'scale(0.97)' : 'scale(1)',
+                        }}>
+                          Confirm
+                        </div>
                       </div>
+
+                      {/* Success after confirm */}
                       {showSuccChat && (
                         <div style={{
-                          borderTop: `1px solid ${GRAY_200}`, padding: '7px 10px',
-                          opacity: sSpring,
+                          marginTop: 8, opacity: sSpring,
+                          display: 'flex', alignItems: 'center', gap: 4,
                         }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                            <svg width="10" height="10" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
-                              <circle cx="7" cy="7" r="7" fill={GREEN} />
-                              <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            <span style={{ fontSize: 10, fontWeight: 600, color: '#111' }}>Swap executed successfully</span>
-                          </div>
-                          <div style={{
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            height: 22, paddingLeft: 10, paddingRight: 10,
-                            border: `2px solid ${PURPLE}`, borderRadius: 22,
-                            color: PURPLE, fontSize: 8, fontWeight: 600,
-                          }}>
-                            View on Etherscan
-                          </div>
+                          <svg width="10" height="10" viewBox="0 0 14 14" style={{ flexShrink: 0 }}>
+                            <circle cx="7" cy="7" r="7" fill={GREEN} />
+                            <path d="M4 7l2 2 4-4" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: GREEN }}>Swap executed successfully</span>
                         </div>
                       )}
                     </div>
@@ -735,133 +749,167 @@ export const HeroDemo: React.FC = () => {
             {!showGrantView ? (
               /* Permission configure view */
               <>
-                <div style={{ padding: '12px 16px 8px', flexShrink: 0 }}>
+                {/* Header with close button */}
+                <div style={{ padding: '14px 32px 8px', flexShrink: 0, position: 'relative' }}>
                   <div style={{ fontSize: 14, fontWeight: 600, color: '#000' }}>Set agent permissions</div>
-                </div>
-
-                <div style={{ flex: 1, display: 'flex', gap: 12, padding: '4px 16px', overflow: 'hidden' }}>
-                  {/* Token list */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '35%', flexShrink: 0 }}>
-                    <PermTokenRow symbol="ETH" name="Ethereum" logo="/logos/eth-logo.png" selected={ethPermSel} checked={ethPermCheck} />
-                    <PermTokenRow symbol="USDC" name="USD Coin" logo="/logos/usdc-logo.png" selected={usdcPermSel} checked={usdcPermCheck} />
-                  </div>
-
-                  {/* Form fields */}
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <PermFloatingInput label="Spend limit" value={pLim} showCursor={limCur} suffix={limSuffix} />
-                    <PermFloatingInput label="Frequency" value={pFreq} showCursor={freqCur} />
-                    <PermFloatingInput label="Start date" value={pStart} showCursor={strtCur} />
-                    <PermFloatingInput label="End date" value={pEnd} showCursor={endCur} />
+                  <div style={{
+                    position: 'absolute', top: 14, right: 20,
+                    width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <svg width="12" height="12" fill="none" stroke={GRAY_400} viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </div>
                 </div>
 
-                {/* Footer */}
+                {/* Centered content area */}
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', gap: 16, padding: '8px 32px', width: '100%', maxWidth: 500 }}>
+                    {/* Token list */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '38%', flexShrink: 0 }}>
+                      <PermTokenRow symbol="ETH" name="Ethereum" logo="/logos/eth-logo.png" selected={ethPermSel} checked={ethPermCheck} />
+                      <PermTokenRow symbol="USDC" name="USD Coin" logo="/logos/usdc-logo.png" selected={usdcPermSel} checked={usdcPermCheck} />
+                    </div>
+
+                    {/* Form fields */}
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <PermFloatingInput label="Spend limit" value={pLim} showCursor={limCur} suffix={limSuffix} />
+                      <PermFloatingInput label="Frequency" value={pFreq} showCursor={freqCur} />
+                      <PermFloatingInput label="Start date" value={pStart} showCursor={strtCur} />
+                      <PermFloatingInput label="End date" value={pEnd} showCursor={endCur} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer - centered */}
                 <div style={{
                   flexShrink: 0, borderTop: `1px solid ${GRAY_200}`,
-                  padding: '8px 16px', display: 'flex', gap: 8,
+                  padding: '10px 32px', display: 'flex', justifyContent: 'center',
                 }}>
-                  <div style={{
-                    height: 32, paddingLeft: 14, paddingRight: 14,
-                    borderRadius: 4, border: `2px solid ${RED}`,
-                    backgroundColor: 'white', color: RED,
-                    fontSize: 10, fontWeight: 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    Cancel
-                  </div>
-                  <div style={{
-                    flex: 1, height: 32, borderRadius: 4,
-                    backgroundColor: canGrant ? PURPLE : GRAY_300,
-                    color: canGrant ? 'white' : GRAY_500,
-                    fontSize: 10, fontWeight: 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transform: grantPress ? 'scale(0.97)' : 'scale(1)',
-                  }}>
-                    Grant permissions
+                  <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 430 }}>
+                    <div style={{
+                      height: 32, paddingLeft: 16, paddingRight: 16,
+                      borderRadius: 4, border: `2px solid ${RED}`,
+                      backgroundColor: 'white', color: RED,
+                      fontSize: 10, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      Cancel
+                    </div>
+                    <div style={{
+                      flex: 1, height: 32, borderRadius: 4,
+                      backgroundColor: canGrant ? PURPLE : GRAY_300,
+                      color: canGrant ? 'white' : GRAY_500,
+                      fontSize: 10, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transform: grantPress ? 'scale(0.97)' : 'scale(1)',
+                    }}>
+                      Grant permissions
+                    </div>
                   </div>
                 </div>
               </>
             ) : !showSuccess ? (
-              /* Grant processing view */
+              /* Grant processing view - matches GrantPermissionsModal */
               <>
-                <div style={{ padding: '16px', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#000' }}>Grant agent permissions</div>
+                {/* Title - centered like real modal p-8 pb-4 */}
+                <div style={{ padding: '22px 32px 10px', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#000' }}>Grant agent permissions</div>
                 </div>
 
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '8px 16px' }}>
-                  <div style={{ width: '100%', maxWidth: 280 }}>
+                {/* StepList - centered like px-8 pt-4 pb-8 flex justify-center / max-w-md */}
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'center', padding: '10px 32px' }}>
+                  <div style={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {/* Step 1 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '6px 0' }}>
-                      {s1Status === 'loading' ? <GrantSpinner size={16} /> : s1Status === 'completed' ? <StepCheckIcon /> : <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${GRAY_300}` }} />}
-                      <span style={{ fontSize: 11, color: s1Status === 'completed' ? GRAY_500 : '#000', fontWeight: 500 }}>
-                        1. Grant ERC-7715 permissions
-                      </span>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{
+                          fontSize: 11,
+                          color: s1Status === 'completed' ? '#000' : s1Status === 'loading' ? GRAY_500 : GRAY_500,
+                          fontWeight: 400,
+                        }}>
+                          1. Grant ERC-7715 permissions
+                        </span>
+                        <div style={{ marginLeft: 8 }}>
+                          {s1Status === 'loading' ? <GrantSpinner size={16} /> : s1Status === 'completed' ? <StepCheckIcon /> : null}
+                        </div>
+                      </div>
+                      {s1Status === 'loading' && grantStage && (
+                        <div style={{ fontSize: 9, color: GRAY_500, fontStyle: 'italic', marginTop: 3 }}>
+                          {grantStage}
+                        </div>
+                      )}
                     </div>
                     {/* Step 2 */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, padding: '6px 0' }}>
-                      {s2Status === 'loading' ? <GrantSpinner size={16} /> : s2Status === 'completed' ? <StepCheckIcon /> : <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${GRAY_300}` }} />}
-                      <span style={{ fontSize: 11, color: s2Status === 'completed' ? GRAY_500 : (s2Status === 'pending' ? GRAY_400 : '#000'), fontWeight: 500 }}>
-                        2. Register wallet agent
-                      </span>
-                    </div>
-                    {grantStage && (
-                      <div style={{ fontSize: 9, color: GRAY_500, textAlign: 'center', marginTop: 8 }}>
-                        {grantStage}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{
+                          fontSize: 11,
+                          color: s2Status === 'completed' ? '#000' : s2Status === 'loading' ? GRAY_500 : GRAY_500,
+                          fontWeight: 400,
+                        }}>
+                          2. Register wallet agent
+                        </span>
+                        <div style={{ marginLeft: 8 }}>
+                          {s2Status === 'loading' ? <GrantSpinner size={16} /> : s2Status === 'completed' ? <StepCheckIcon /> : null}
+                        </div>
                       </div>
-                    )}
+                      {s2Status === 'loading' && grantStage && (
+                        <div style={{ fontSize: 9, color: GRAY_500, fontStyle: 'italic', marginTop: 3 }}>
+                          {grantStage}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Footer */}
+                {/* Footer - centered, matches real px-6 py-4 / w-[656px] */}
                 <div style={{
                   flexShrink: 0, borderTop: `1px solid ${GRAY_200}`,
-                  padding: '8px 16px', display: 'flex', gap: 8,
+                  padding: '10px 32px', display: 'flex', justifyContent: 'center',
                 }}>
-                  <div style={{
-                    height: 32, paddingLeft: 14, paddingRight: 14,
-                    borderRadius: 4, border: `2px solid ${RED}`,
-                    backgroundColor: 'white', color: RED,
-                    fontSize: 10, fontWeight: 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    Back
-                  </div>
-                  <div style={{
-                    flex: 1, height: 32, borderRadius: 4,
-                    backgroundColor: PURPLE, color: 'white',
-                    fontSize: 10, fontWeight: 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-                  }}>
-                    <GrantSpinner size={10} color="white" />
-                    <span>Processing...</span>
+                  <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 430 }}>
+                    <div style={{
+                      height: 32, paddingLeft: 16, paddingRight: 16,
+                      borderRadius: 4, border: `2px solid ${RED}`,
+                      backgroundColor: 'white', color: RED,
+                      fontSize: 10, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      Back
+                    </div>
+                    <div style={{
+                      flex: 1, height: 32, borderRadius: 4,
+                      backgroundColor: PURPLE, color: 'white',
+                      fontSize: 10, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                    }}>
+                      <GrantSpinner size={10} color="white" />
+                      <span>Processing...</span>
+                    </div>
                   </div>
                 </div>
               </>
             ) : (
-              /* Success view */
+              /* Success view - matches real GrantPermissionsModal success */
               <>
-                <div style={{ padding: '16px', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#000' }}>Permissions granted!</div>
+                <div style={{ padding: '22px 32px 10px', flexShrink: 0, display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#000', textAlign: 'center' }}>Permissions granted!</div>
                 </div>
-                <div style={{
-                  flex: 1, display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', gap: 12,
-                }}>
-                  <svg width="40" height="40" viewBox="0 0 40 40">
-                    <circle cx="20" cy="20" r="20" fill={GREEN} />
-                    <path d="M12 20l5 5 11-11" stroke="white" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <div style={{ fontSize: 10, color: GRAY_600, textAlign: 'center', maxWidth: 240 }}>
-                    Your wallet agent permissions have been successfully configured!
-                  </div>
-                  <div style={{
-                    height: 32, paddingLeft: 20, paddingRight: 20,
-                    borderRadius: 4, backgroundColor: PURPLE, color: 'white',
-                    fontSize: 10, fontWeight: 500,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    transform: frame >= DONE_CLICK ? 'scale(0.97)' : 'scale(1)',
-                  }}>
-                    Done
+                <div style={{ padding: '10px 32px', display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+                    <div style={{ fontSize: 10, color: GRAY_600, textAlign: 'center', maxWidth: 240 }}>
+                      Your wallet agent permissions have been successfully configured!
+                    </div>
+                    <div style={{
+                      width: 180, height: 32,
+                      borderRadius: 4, backgroundColor: PURPLE, color: 'white',
+                      fontSize: 10, fontWeight: 500,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transform: frame >= DONE_CLICK ? 'scale(0.97)' : 'scale(1)',
+                    }}>
+                      Done
+                    </div>
                   </div>
                 </div>
               </>
