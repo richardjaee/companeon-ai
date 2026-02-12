@@ -169,11 +169,10 @@ case "$1" in
         # Format: ENV_VAR_NAME:secret-name-in-gcp
         SECRET_PAIRS="
             GOOGLE_GENAI_API_KEY:google-genai-api-key
+            GOOGLE_AI_STUDIO_KEY:google-ai-studio-key
             BACKEND_DELEGATION_KEY:backend-delegation-key
             TRANSFER_AGENT_PRIVATE_KEY:transfer-agent-private-key
-            DCA_AGENT_PRIVATE_KEY:dca-agent-private-key
             PRIVATE_KEY:agent-private-key
-            PRIVATE_KEY_ETH:agent-private-key-eth
             GAS_SPONSOR_KEY:gas-sponsor-key
             CMC_API_KEY:cmc-api-key
             PPLX_API_KEY:pplx-api-key
@@ -182,7 +181,9 @@ case "$1" in
             GATEWAY_API_KEY:gateway-api-key
             INTERNAL_API_KEY:internal-api-key
             ALCHEMY_RPC_URL:alchemy-rpc-url
+            ETH_MAINNET_RPC_URL:eth-mainnet-rpc-url
             SEPOLIA_RPC_URL:sepolia-rpc-url
+            TREASURY_ADDRESS:treasury-address
         "
 
         for pair in $SECRET_PAIRS; do
