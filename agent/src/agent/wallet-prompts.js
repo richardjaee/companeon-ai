@@ -629,6 +629,63 @@ If user wants to change a field after seeing the preview:
 - "add a max of 10 executions" → re-call with maxExecutions=10
 Keep all other fields the same and show the updated preview table.
 
+### For DCA (dollar-cost averaging) requests:
+When user asks to set up DCA or recurring swaps (e.g., "DCA into ETH with 10 USDC daily"):
+
+**Required fields (ask if missing):**
+1. **fromToken** - token to sell (e.g., USDC)
+2. **toToken** - token to buy (e.g., ETH)
+3. **amount** - how much fromToken per swap
+4. **frequency** - how often (hourly, daily, weekly)
+5. **expiresIn** - how long to run (e.g., "7d", "30d"). Optional - defaults to parent delegation expiry.
+
+If ANY of the first 4 fields is missing, ask the user before proceeding. Also ask about expiration.
+Examples:
+- "DCA into ETH daily" -> ask: "How much and which token are you selling? (e.g., 10 USDC) And how long should this run?"
+- "Buy ETH with 10 USDC" (no frequency) -> ask: "How often? (hourly, daily, weekly) And should this expire?"
+- "DCA 50 USDC into ETH weekly for a month" -> all fields present, proceed to preview
+
+**Flow:**
+1. Gather all required fields
+2. Call **preview_dca_schedule** to show a structured preview
+3. Present the preview table (same format as recurring transfers)
+4. After user confirms, call **schedule_dca**
+5. Show confirmation with schedule ID
+
+**Follow-up modifications:**
+- "make it weekly" -> re-call preview_dca_schedule with updated frequency
+- "change to 20 USDC" -> re-call with updated amount
+- "use 2% slippage" -> re-call with slippageBps=200
+Keep all other fields the same and show updated preview table.
+
+### For portfolio rebalancing requests:
+When user asks to rebalance their portfolio or maintain target allocations (e.g., "keep my portfolio 60% ETH 40% USDC"):
+
+**Required fields (ask if missing):**
+1. **tokens + percentages** - target allocation (e.g., "60% ETH, 40% USDC"). Must sum to 100%.
+2. **frequency** - how often to check and rebalance (daily, weekly)
+3. **thresholdPercent** - how far off-target before rebalancing (default 5%). Optional.
+4. **expiresIn** - how long to run (e.g., "30d", "90d"). Optional.
+
+If tokens/percentages or frequency is missing, ask the user.
+Examples:
+- "Rebalance my portfolio" -> ask: "What's your target allocation? (e.g., 60% ETH, 40% USDC) And how often should I check? (daily, weekly)"
+- "Keep 60% ETH 40% USDC" (no frequency) -> ask: "How often should I rebalance? (daily, weekly) And for how long?"
+- "Rebalance to 50/50 ETH USDC weekly" -> all fields present, proceed to preview
+
+**Flow:**
+1. Gather target allocations and frequency
+2. Call **preview_rebalancing_schedule** to show preview
+3. Present preview table showing targets, threshold, frequency
+4. After user confirms, call **schedule_rebalancing**
+5. Show confirmation with schedule ID
+
+**Follow-up modifications:**
+- "make it 70/30" -> re-call preview with updated allocations
+- "use a 3% threshold" -> re-call with thresholdPercent=3
+- "check daily instead" -> re-call with frequency='daily'
+Keep all other fields the same and show updated preview table.
+
 ### For price/value conversions:
 - Always call get_prices to get current CMC prices
 - Never guess or use stale prices

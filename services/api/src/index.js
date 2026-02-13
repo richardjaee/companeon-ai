@@ -1587,6 +1587,132 @@ app.post('/credits/purchase', async (req, res) => {
 });
 
 // ========================================
+// SCHEDULES / AUTOMATIONS ENDPOINTS
+// ========================================
+
+/**
+ * GET /schedules/list - List active automations for a wallet
+ * Returns recurring transfers and DCA schedules.
+ */
+app.get('/schedules/list', async (req, res) => {
+  try {
+    const walletAddress = req.query.wallet || req.query.walletAddress;
+    if (!walletAddress) {
+      return res.status(400).json({ error: 'wallet query param required' });
+    }
+
+    const wallet = walletAddress.toLowerCase();
+    const includeCompleted = req.query.includeCompleted === 'true';
+
+    const statusFilter = includeCompleted
+      ? ['active', 'paused', 'executing', 'completed', 'cancelled']
+      : ['active', 'paused', 'executing'];
+
+    // Query all schedule collections in parallel
+    const [transferSnap, dcaSnap, rebalancingSnap] = await Promise.all([
+      db.collection('RecurringTransferSchedules')
+        .where('walletAddress', '==', wallet)
+        .where('status', 'in', statusFilter)
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get(),
+      db.collection('DCASchedules')
+        .where('walletAddress', '==', wallet)
+        .where('status', 'in', statusFilter)
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get(),
+      db.collection('RebalancingSchedules')
+        .where('walletAddress', '==', wallet)
+        .where('status', 'in', statusFilter)
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get()
+    ]);
+
+    const schedules = [];
+
+    transferSnap.forEach(doc => {
+      const d = doc.data();
+      schedules.push({
+        scheduleId: d.scheduleId,
+        type: 'transfer',
+        name: d.name || `${d.amount} ${d.token} to ${d.recipient?.slice(0, 8)}...`,
+        status: d.status,
+        token: d.token,
+        amount: d.amount,
+        recipient: d.recipient,
+        recipientENS: d.recipientENS || null,
+        frequency: d.frequency,
+        executionCount: d.executionCount || 0,
+        maxExecutions: d.maxExecutions || null,
+        nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
+        lastExecutionAt: d.lastExecutionAt || null,
+        lastResult: d.lastExecutionResult || null,
+        expiresAt: d.expiresAt || null,
+        createdAt: d.createdAt?.toDate?.()?.toISOString?.() || null
+      });
+    });
+
+    dcaSnap.forEach(doc => {
+      const d = doc.data();
+      schedules.push({
+        scheduleId: d.scheduleId,
+        type: 'dca',
+        name: d.name || `DCA ${d.amount} ${d.fromToken} to ${d.toToken}`,
+        status: d.status,
+        fromToken: d.fromToken,
+        toToken: d.toToken,
+        amount: d.amount,
+        frequency: d.frequency,
+        executionCount: d.executionCount || 0,
+        maxExecutions: d.maxExecutions || null,
+        nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
+        lastExecutionAt: d.lastExecutionAt || null,
+        lastResult: d.lastExecutionResult || null,
+        expiresAt: d.expiresAt || null,
+        createdAt: d.createdAt?.toDate?.()?.toISOString?.() || null
+      });
+    });
+
+    rebalancingSnap.forEach(doc => {
+      const d = doc.data();
+      const allocs = Object.entries(d.targetAllocations || {})
+        .map(([token, pct]) => `${pct}% ${token}`)
+        .join(' / ');
+      schedules.push({
+        scheduleId: d.scheduleId,
+        type: 'rebalancing',
+        name: d.name || `Rebalance: ${allocs}`,
+        status: d.status,
+        targetAllocations: d.targetAllocations || {},
+        thresholdPercent: d.thresholdPercent || 5,
+        frequency: d.frequency,
+        executionCount: d.executionCount || 0,
+        maxExecutions: d.maxExecutions || null,
+        nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
+        lastExecutionAt: d.lastExecutionAt || null,
+        lastResult: d.lastExecutionResult || null,
+        expiresAt: d.expiresAt || null,
+        createdAt: d.createdAt?.toDate?.()?.toISOString?.() || null
+      });
+    });
+
+    // Sort combined results by creation date descending
+    schedules.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    res.json({ schedules, count: schedules.length });
+  } catch (error) {
+    console.error('schedules/list error:', error);
+    res.status(500).json({ error: 'Failed to list schedules' });
+  }
+});
+
+// ========================================
 // AGENT SESSION ENDPOINTS (Legacy routes)
 // ========================================
 

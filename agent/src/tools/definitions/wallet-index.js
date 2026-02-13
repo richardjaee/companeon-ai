@@ -17,6 +17,8 @@ import { gasTools } from './gas.js';
 import { envioTools } from './envio.js';
 import { transferAgentTools } from './transfer-agent.js';
 import { autonomousAgentTools } from './autonomous-agents.js';
+import { dcaAgentTools } from './dca-agent.js';
+import { rebalancingAgentTools } from './rebalancing-agent.js';
 import { aggregatorTools } from './aggregator.js';
 
 // Add default tags to tools that don't have them
@@ -89,6 +91,16 @@ export function registerWalletTools(registry) {
     registry.register(tool);
   }
   for (const tool of autonomousAgentTools) {
+    registry.register(tool);
+  }
+
+  // DCA tools - recurring swap schedules
+  for (const tool of dcaAgentTools) {
+    registry.register(tool);
+  }
+
+  // Rebalancing tools - portfolio rebalancing schedules
+  for (const tool of rebalancingAgentTools) {
     registry.register(tool);
   }
 

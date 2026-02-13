@@ -21,8 +21,8 @@ const db = getFirestore();
 const TRANSFER_SCHEDULE_COLLECTION = 'RecurringTransferSchedules';
 
 function getTransferAgentAddress() {
-  const key = process.env.TRANSFER_AGENT_PRIVATE_KEY;
-  if (!key) throw new Error('TRANSFER_AGENT_PRIVATE_KEY not configured');
+  const key = process.env.BACKEND_SUBDELEGATION_KEY;
+  if (!key) throw new Error('BACKEND_SUBDELEGATION_KEY not configured');
   return new ethers.Wallet(key).address;
 }
 

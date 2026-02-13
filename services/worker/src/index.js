@@ -14,6 +14,8 @@ import { Firestore } from '@google-cloud/firestore';
 
 // Jobs
 import { runTransferAgent } from './jobs/dcaAgent.js';
+import { runDCASwapAgent } from './jobs/dcaSwapAgent.js';
+import { runRebalancingAgent } from './jobs/rebalancingAgent.js';
 import { cleanupExpired } from './jobs/cleanup.js';
 
 dotenv.config();
@@ -42,6 +44,8 @@ app.get('/health', (req, res) => {
     timestamp: new Date().toISOString(),
     jobs: {
       transferAgent: transferAgentJobStatus,
+      dcaSwap: dcaSwapJobStatus,
+      rebalancing: rebalancingJobStatus,
       cleanup: cleanupJobStatus
     }
   });
@@ -51,6 +55,8 @@ app.get('/health', (req, res) => {
 // Job Status Tracking
 // ========================================
 let transferAgentJobStatus = { lastRun: null, status: 'idle', nextRun: null };
+let dcaSwapJobStatus = { lastRun: null, status: 'idle', nextRun: null };
+let rebalancingJobStatus = { lastRun: null, status: 'idle', nextRun: null };
 let cleanupJobStatus = { lastRun: null, status: 'idle', nextRun: null };
 
 // ========================================
@@ -71,13 +77,33 @@ app.post('/jobs/transfers', async (req, res) => {
   }
 });
 
-// Backwards-compatible alias
-app.post('/jobs/dca', async (req, res) => {
+app.post('/jobs/dca-swaps', async (req, res) => {
   try {
-    const result = await runTransferAgent(firestore);
+    console.log('Manual DCA swap agent triggered');
+    dcaSwapJobStatus.status = 'running';
+    const result = await runDCASwapAgent(firestore);
+    dcaSwapJobStatus.status = 'idle';
+    dcaSwapJobStatus.lastRun = new Date().toISOString();
     res.json({ success: true, ...result });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to run transfer agent' });
+    dcaSwapJobStatus.status = 'error';
+    console.error('DCA swap agent error:', error);
+    res.status(500).json({ error: 'Failed to run DCA swap agent' });
+  }
+});
+
+app.post('/jobs/rebalancing', async (req, res) => {
+  try {
+    console.log('Manual rebalancing agent triggered');
+    rebalancingJobStatus.status = 'running';
+    const result = await runRebalancingAgent(firestore);
+    rebalancingJobStatus.status = 'idle';
+    rebalancingJobStatus.lastRun = new Date().toISOString();
+    res.json({ success: true, ...result });
+  } catch (error) {
+    rebalancingJobStatus.status = 'error';
+    console.error('Rebalancing agent error:', error);
+    res.status(500).json({ error: 'Failed to run rebalancing agent' });
   }
 });
 
@@ -115,6 +141,40 @@ if (process.env.ENABLE_TRANSFER_AGENT !== 'false') {
     }
   });
   console.log('Transfer agent job scheduled (every 5 minutes)');
+}
+
+// Run DCA swap agent every 5 minutes
+if (process.env.ENABLE_TRANSFER_AGENT !== 'false') {
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('Running scheduled DCA swap agent...');
+    dcaSwapJobStatus.status = 'running';
+    try {
+      await runDCASwapAgent(firestore);
+      dcaSwapJobStatus.status = 'idle';
+      dcaSwapJobStatus.lastRun = new Date().toISOString();
+    } catch (error) {
+      dcaSwapJobStatus.status = 'error';
+      console.error('Scheduled DCA swap agent error:', error);
+    }
+  });
+  console.log('DCA swap agent job scheduled (every 5 minutes)');
+}
+
+// Run rebalancing agent every 5 minutes
+if (process.env.ENABLE_TRANSFER_AGENT !== 'false') {
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('Running scheduled rebalancing agent...');
+    rebalancingJobStatus.status = 'running';
+    try {
+      await runRebalancingAgent(firestore);
+      rebalancingJobStatus.status = 'idle';
+      rebalancingJobStatus.lastRun = new Date().toISOString();
+    } catch (error) {
+      rebalancingJobStatus.status = 'error';
+      console.error('Scheduled rebalancing agent error:', error);
+    }
+  });
+  console.log('Rebalancing agent job scheduled (every 5 minutes)');
 }
 
 // Cleanup expired auth/sessions every 30 minutes (matches session TTL)

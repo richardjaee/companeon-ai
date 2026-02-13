@@ -84,7 +84,7 @@ sync-secrets:
 grant-secrets:
 	@echo "Granting Cloud Run service account access to secrets (dev)..."
 	@SA="$$(gcloud projects describe companeon --format='value(projectNumber)')-compute@developer.gserviceaccount.com"; \
-	for secret in google-genai-api-key google-ai-studio-key backend-delegation-key agent-private-key gas-sponsor-key transfer-agent-private-key cmc-api-key pplx-api-key envio-api-key zerox-api-key gateway-api-key internal-api-key alchemy-rpc-url eth-mainnet-rpc-url sepolia-rpc-url treasury-address; do \
+	for secret in google-genai-api-key google-ai-studio-key backend-delegation-key agent-private-key gas-sponsor-key backend-subdelegation-key cmc-api-key pplx-api-key envio-api-key zerox-api-key gateway-api-key internal-api-key alchemy-rpc-url eth-mainnet-rpc-url sepolia-rpc-url treasury-address; do \
 		if gcloud secrets describe $$secret >/dev/null 2>&1; then \
 			gcloud secrets add-iam-policy-binding $$secret --member="serviceAccount:$$SA" --role="roles/secretmanager.secretAccessor" --quiet 2>/dev/null || true; \
 			echo "Granted access to $$secret"; \
@@ -101,7 +101,7 @@ sync-secrets-prod:
 grant-secrets-prod:
 	@echo "Granting Cloud Run service account access to secrets (prod)..."
 	@SA="$$(gcloud projects describe companeon-prod --format='value(projectNumber)')-compute@developer.gserviceaccount.com"; \
-	for secret in google-genai-api-key google-ai-studio-key backend-delegation-key agent-private-key gas-sponsor-key transfer-agent-private-key cmc-api-key pplx-api-key envio-api-key zerox-api-key gateway-api-key internal-api-key alchemy-rpc-url eth-mainnet-rpc-url treasury-address; do \
+	for secret in google-genai-api-key google-ai-studio-key backend-delegation-key agent-private-key gas-sponsor-key backend-subdelegation-key cmc-api-key pplx-api-key envio-api-key zerox-api-key gateway-api-key internal-api-key alchemy-rpc-url eth-mainnet-rpc-url treasury-address; do \
 		if gcloud secrets describe $$secret --project=companeon-prod >/dev/null 2>&1; then \
 			gcloud secrets add-iam-policy-binding $$secret --project=companeon-prod --member="serviceAccount:$$SA" --role="roles/secretmanager.secretAccessor" --quiet 2>/dev/null || true; \
 			echo "Granted access to $$secret"; \
@@ -113,13 +113,13 @@ grant-secrets-prod:
 REGISTRY=us-central1-docker.pkg.dev/companeon/cloud-run-source-deploy
 
 # Agent secrets (referenced from Secret Manager)
-AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,GOOGLE_AI_STUDIO_KEY=google-ai-studio-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,GAS_SPONSOR_KEY=gas-sponsor-key:latest,TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest
+AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,GOOGLE_AI_STUDIO_KEY=google-ai-studio-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,GAS_SPONSOR_KEY=gas-sponsor-key:latest,BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest
 
 # API secrets (referenced from Secret Manager)
 API_SECRETS=TREASURY_ADDRESS=treasury-address:latest,INTERNAL_API_KEY=internal-api-key:latest
 
 # Worker secrets (referenced from Secret Manager)
-WORKER_SECRETS=TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,SEPOLIA_RPC_URL=sepolia-rpc-url:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
+WORKER_SECRETS=BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,CMC_API_KEY=cmc-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,SEPOLIA_RPC_URL=sepolia-rpc-url:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
 
 # Quick Deploy DEV - local build + push (fast, uses Docker cache)
 deploy-agent-dev:
@@ -165,9 +165,9 @@ deploy-worker-dev:
 		--quiet
 
 # Prod secrets (referenced from Secret Manager in companeon-prod project)
-AGENT_SECRETS_PROD=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,GOOGLE_AI_STUDIO_KEY=google-ai-studio-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,GAS_SPONSOR_KEY=gas-sponsor-key:latest,TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest,TREASURY_ADDRESS=treasury-address:latest
+AGENT_SECRETS_PROD=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,GOOGLE_AI_STUDIO_KEY=google-ai-studio-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,GAS_SPONSOR_KEY=gas-sponsor-key:latest,BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest,TREASURY_ADDRESS=treasury-address:latest
 
-WORKER_SECRETS_PROD=TRANSFER_AGENT_PRIVATE_KEY=transfer-agent-private-key:latest,CMC_API_KEY=cmc-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
+WORKER_SECRETS_PROD=BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,CMC_API_KEY=cmc-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
 
 PROD_PROJECT=companeon-prod
 PROD_REGION=us-central1

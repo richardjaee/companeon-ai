@@ -375,8 +375,7 @@ LLM Tools
 
 Environment
 
-- `DCA_AGENT_PRIVATE_KEY` – EOA for the DCA Agent (recurring DCA)
-- `TRANSFER_AGENT_PRIVATE_KEY` – EOA for the Transfer Agent (recurring transfers)
+- `BACKEND_SUBDELEGATION_KEY` – EOA for sub-delegated agents (recurring transfers, DCA swaps)
 - `BACKEND_DELEGATION_KEY` – backend delegate key (ERC‑7715)
 - `FIREBASE_FUNCTIONS_URL` – base URL for the trigger endpoint (optional)
 - `GOOGLE_CLOUD_PROJECT` / `FIREBASE_PROJECT_ID` – Firestore project

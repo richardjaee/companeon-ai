@@ -101,7 +101,7 @@ steps:
       - '--min-instances=1'
       - '--max-instances=5'
       - '--set-env-vars=NODE_ENV=production,SERVICE_NAME=companeon-worker'
-      - '--set-secrets=CMC_API_KEY=cmc-api-key:latest,DCA_AGENT_PRIVATE_KEY=dca-agent-private-key:latest'
+      - '--set-secrets=CMC_API_KEY=cmc-api-key:latest,BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,ZEROX_API_KEY=zerox-api-key:latest'
 
 options:
   logging: CLOUD_LOGGING_ONLY

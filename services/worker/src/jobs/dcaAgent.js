@@ -90,9 +90,9 @@ function encodeExecution(target, value, callData) {
 async function executeRecurringTransfer(firestore, schedule) {
   const { scheduleId, walletAddress, recipient, token, amount, chainId } = schedule;
 
-  const agentKey = process.env.TRANSFER_AGENT_PRIVATE_KEY;
+  const agentKey = process.env.BACKEND_SUBDELEGATION_KEY;
   if (!agentKey) {
-    throw new Error('TRANSFER_AGENT_PRIVATE_KEY not configured');
+    throw new Error('BACKEND_SUBDELEGATION_KEY not configured');
   }
 
   // Fetch sub-delegation (keyed by walletAddress_scheduleId for isolation)
@@ -166,9 +166,9 @@ async function executeRecurringTransfer(firestore, schedule) {
 export async function runTransferAgent(firestore) {
   console.log('[Transfer Agent] Starting scheduled run...');
 
-  const agentKey = process.env.TRANSFER_AGENT_PRIVATE_KEY;
+  const agentKey = process.env.BACKEND_SUBDELEGATION_KEY;
   if (!agentKey) {
-    console.warn('[Transfer Agent] TRANSFER_AGENT_PRIVATE_KEY not set, skipping');
+    console.warn('[Transfer Agent] BACKEND_SUBDELEGATION_KEY not set, skipping');
     return { skipped: true, reason: 'No agent key configured' };
   }
 

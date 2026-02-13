@@ -48,7 +48,7 @@ export default function GetStartedSection({ onStartCoinSelection, isSelectionMod
                 <p className="text-sm text-gray-600">
                   {!isWalletConnected
                     ? "Connect your wallet to see your crypto and manage your agent permissions."
-                    : "Learn how to set agent permissions."
+                    : "Learn about delegated permissions with ERC-7715."
                   }
                 </p>
               </div>
