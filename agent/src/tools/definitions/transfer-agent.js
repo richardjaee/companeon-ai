@@ -26,15 +26,47 @@ function getTransferAgentAddress() {
   return new ethers.Wallet(key).address;
 }
 
-function calculateNextRun(frequency) {
+function calculateNextRun(frequency, options = {}) {
   const now = new Date();
-  switch (frequency) {
-    case 'hourly': return new Date(now.getTime() + 60 * 60 * 1000);
-    case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
-    default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const { scheduledTime, timezone } = options;
+
+  if (!scheduledTime || frequency === 'test') {
+    switch (frequency) {
+      case 'hourly': return new Date(now.getTime() + 60 * 60 * 1000);
+      case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
+      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
   }
+
+  // Time-of-day scheduling: find next occurrence of scheduledTime in the given timezone
+  const [hour, minute] = scheduledTime.split(':').map(Number);
+  const tz = timezone || 'UTC';
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric', minute: 'numeric',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const nowHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const nowMin = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+
+  const targetMinutes = hour * 60 + minute;
+  const currentMinutes = nowHour * 60 + nowMin;
+  let minutesUntil = targetMinutes - currentMinutes;
+
+  if (minutesUntil <= 0) {
+    switch (frequency) {
+      case 'hourly': minutesUntil += 60; break;
+      case 'daily': minutesUntil += 24 * 60; break;
+      case 'weekly': minutesUntil += 7 * 24 * 60; break;
+      default: minutesUntil += 24 * 60; break;
+    }
+  }
+
+  return new Date(now.getTime() + minutesUntil * 60 * 1000);
 }
 
 function formatFrequency(f) {
@@ -104,22 +136,32 @@ export const transferAgentTools = [
       amount: z.string(),
       recipient: z.string(),
       frequency: z.enum(['hourly', 'daily', 'weekly', 'test']),
+      scheduledTime: z.string().optional().describe('Time of day in HH:MM 24h format (e.g., "14:30" for 2:30 PM). If omitted, runs at interval from creation time.'),
+      timezone: z.string().optional().describe('IANA timezone for scheduledTime (e.g., "America/New_York", "Europe/London"). Required when scheduledTime is set.'),
       expiresIn: z.string().optional().describe('Duration for sub-delegation expiry (e.g., "7d", "30d", "2w", "1m"). Defaults to parent delegation expiry.'),
       name: z.string().optional(),
       maxExecutions: z.number().optional()
     }),
     tags: ['transfer', 'schedule', 'a2a', 'agent', 'preview'],
     handler: async (params, context) => {
-      const { token, amount, recipient, frequency, expiresIn, name, maxExecutions } = params;
+      const { token, amount, recipient, frequency, scheduledTime, timezone, expiresIn, name, maxExecutions } = params;
       const walletAddress = context?.walletAddress || context?.memoryFacts?.walletAddress;
       const logger = context?.logger;
       if (!walletAddress) throw new Error('Wallet address required');
 
       const { address, ensName } = await resolveRecipient(recipient, logger);
-      const nextRun = calculateNextRun(frequency);
+      const nextRun = calculateNextRun(frequency, { scheduledTime, timezone });
 
       const durationSec = parseDuration(expiresIn);
       const expiresAt = durationSec ? Math.floor(Date.now() / 1000) + durationSec : null;
+
+      const freqDisplay = scheduledTime && frequency !== 'test'
+        ? `${formatFrequency(frequency)} at ${scheduledTime}${timezone ? ` (${timezone})` : ''}`
+        : formatFrequency(frequency);
+
+      const firstRunDisplay = timezone
+        ? nextRun.toLocaleString('en-US', { timeZone: timezone })
+        : nextRun.toLocaleString();
 
       return {
         ask: true,
@@ -127,11 +169,11 @@ export const transferAgentTools = [
           token: token.toUpperCase(), amount,
           recipient: address,
           recipientENS: ensName,
-          frequency: formatFrequency(frequency),
+          frequency: freqDisplay,
           expiresIn: durationSec ? formatDuration(durationSec) : 'Inherits parent delegation',
           expiresAt: expiresAt ? new Date(expiresAt * 1000).toISOString() : null,
           name: name || null,
-          firstExecution: nextRun.toLocaleString(),
+          firstExecution: firstRunDisplay,
           maxExecutions: maxExecutions || 'unlimited'
         }
       };
@@ -145,13 +187,15 @@ export const transferAgentTools = [
       amount: z.string(),
       recipient: z.string(),
       frequency: z.enum(['hourly', 'daily', 'weekly', 'test']),
+      scheduledTime: z.string().optional().describe('Time of day in HH:MM 24h format (e.g., "14:30" for 2:30 PM). If omitted, runs at interval from creation time.'),
+      timezone: z.string().optional().describe('IANA timezone for scheduledTime (e.g., "America/New_York", "Europe/London"). Required when scheduledTime is set.'),
       expiresIn: z.string().optional().describe('Duration for sub-delegation expiry (e.g., "7d", "30d", "2w", "1m"). Defaults to parent delegation expiry.'),
       name: z.string().optional(),
       maxExecutions: z.number().optional()
     }),
     tags: ['transfer', 'schedule', 'a2a', 'agent', 'write'],
     handler: async (params, context) => {
-      const { token, amount, recipient, frequency, expiresIn, name, maxExecutions } = params;
+      const { token, amount, recipient, frequency, scheduledTime, timezone, expiresIn, name, maxExecutions } = params;
       const walletAddress = context?.walletAddress || context?.memoryFacts?.walletAddress;
       const chainId = context?.chainId || context?.memoryFacts?.chainId || 8453;
       const logger = context?.logger;
@@ -222,7 +266,7 @@ export const transferAgentTools = [
         agentType: 'transfer'
       });
 
-      const nextRun = calculateNextRun(frequency);
+      const nextRun = calculateNextRun(frequency, { scheduledTime, timezone });
       const schedule = {
         scheduleId,
         type: 'transfer',
@@ -234,6 +278,8 @@ export const transferAgentTools = [
         recipient: resolvedRecipient,
         recipientENS: ensName,
         frequency,
+        scheduledTime: scheduledTime || null,
+        timezone: timezone || null,
         maxExecutions: maxExecutions || null,
         expiresAt: expiresAtTimestamp || null,
         expiresIn: expiresIn || null,
@@ -256,6 +302,10 @@ export const transferAgentTools = [
         ? `${formatDuration(durationSec)} (${new Date(expiresAtTimestamp * 1000).toLocaleDateString()})`
         : 'Inherits parent delegation';
 
+      const freqDisplay = scheduledTime && frequency !== 'test'
+        ? `${formatFrequency(frequency)} at ${scheduledTime}${timezone ? ` (${timezone})` : ''}`
+        : formatFrequency(frequency);
+
       return {
         success: true,
         scheduleId,
@@ -271,9 +321,9 @@ export const transferAgentTools = [
 | Token       | ${token.toUpperCase()}                     |
 | Amount      | ${amount} ${token.toUpperCase()} per transfer |
 | Recipient   | ${recipientDisplay}                        |
-| Frequency   | ${formatFrequency(frequency)}              |
+| Frequency   | ${freqDisplay}                             |
 | Expires     | ${expiresDisplay}                          |
-| First Run   | ${nextRun.toLocaleString()}                |
+| First Run   | ${timezone ? nextRun.toLocaleString('en-US', { timeZone: timezone }) : nextRun.toLocaleString()} |
 | Max Runs    | ${maxExecutions || 'Unlimited'}            |
 
 Sub-delegation scoped to ${amount} ${token.toUpperCase()}/${frequency} to ${recipientDisplay} only.`

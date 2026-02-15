@@ -793,7 +793,7 @@ async function getTokenPrices(db, symbols) {
 
 // Alchemy RPC URLs by chain
 const ALCHEMY_URLS = {
-  1: process.env.ALCHEMY_RPC_URL || 'https://eth-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY,
+  1: process.env.ETH_MAINNET_RPC_URL || process.env.ALCHEMY_RPC_URL || 'https://eth-mainnet.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY,
   11155111: process.env.SEPOLIA_RPC_URL || 'https://eth-sepolia.g.alchemy.com/v2/' + process.env.ALCHEMY_API_KEY
 };
 
@@ -1644,11 +1644,14 @@ app.get('/schedules/list', async (req, res) => {
         recipient: d.recipient,
         recipientENS: d.recipientENS || null,
         frequency: d.frequency,
+        scheduledTime: d.scheduledTime || null,
+        timezone: d.timezone || null,
         executionCount: d.executionCount || 0,
         maxExecutions: d.maxExecutions || null,
         nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
         lastExecutionAt: d.lastExecutionAt || null,
         lastResult: d.lastExecutionResult || null,
+        executionHistory: d.executionHistory || [],
         expiresAt: d.expiresAt || null,
         createdAt: d.createdAt?.toDate?.()?.toISOString?.() || null
       });
@@ -1665,11 +1668,14 @@ app.get('/schedules/list', async (req, res) => {
         toToken: d.toToken,
         amount: d.amount,
         frequency: d.frequency,
+        scheduledTime: d.scheduledTime || null,
+        timezone: d.timezone || null,
         executionCount: d.executionCount || 0,
         maxExecutions: d.maxExecutions || null,
         nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
         lastExecutionAt: d.lastExecutionAt || null,
         lastResult: d.lastExecutionResult || null,
+        executionHistory: d.executionHistory || [],
         expiresAt: d.expiresAt || null,
         createdAt: d.createdAt?.toDate?.()?.toISOString?.() || null
       });
@@ -1688,11 +1694,14 @@ app.get('/schedules/list', async (req, res) => {
         targetAllocations: d.targetAllocations || {},
         thresholdPercent: d.thresholdPercent || 5,
         frequency: d.frequency,
+        scheduledTime: d.scheduledTime || null,
+        timezone: d.timezone || null,
         executionCount: d.executionCount || 0,
         maxExecutions: d.maxExecutions || null,
         nextRunAt: d.nextRunAt?.toDate?.()?.toISOString?.() || null,
         lastExecutionAt: d.lastExecutionAt || null,
         lastResult: d.lastExecutionResult || null,
+        executionHistory: d.executionHistory || [],
         expiresAt: d.expiresAt || null,
         createdAt: d.createdAt?.toDate?.()?.toISOString?.() || null
       });

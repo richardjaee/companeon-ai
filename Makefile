@@ -116,7 +116,7 @@ REGISTRY=us-central1-docker.pkg.dev/companeon/cloud-run-source-deploy
 AGENT_SECRETS=GOOGLE_GENAI_API_KEY=google-genai-api-key:latest,GOOGLE_AI_STUDIO_KEY=google-ai-studio-key:latest,BACKEND_DELEGATION_KEY=backend-delegation-key:latest,PRIVATE_KEY=agent-private-key:latest,GAS_SPONSOR_KEY=gas-sponsor-key:latest,BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,CMC_API_KEY=cmc-api-key:latest,PPLX_API_KEY=pplx-api-key:latest,ENVIO_API_KEY=envio-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,GATEWAY_API_KEY=gateway-api-key:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest
 
 # API secrets (referenced from Secret Manager)
-API_SECRETS=TREASURY_ADDRESS=treasury-address:latest,INTERNAL_API_KEY=internal-api-key:latest
+API_SECRETS=TREASURY_ADDRESS=treasury-address:latest,INTERNAL_API_KEY=internal-api-key:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest,ETH_MAINNET_RPC_URL=eth-mainnet-rpc-url:latest,CMC_API_KEY=cmc-api-key:latest
 
 # Worker secrets (referenced from Secret Manager)
 WORKER_SECRETS=BACKEND_SUBDELEGATION_KEY=backend-subdelegation-key:latest,CMC_API_KEY=cmc-api-key:latest,ZEROX_API_KEY=zerox-api-key:latest,SEPOLIA_RPC_URL=sepolia-rpc-url:latest,ALCHEMY_RPC_URL=alchemy-rpc-url:latest
@@ -244,8 +244,8 @@ deploy-frontend-dev:
 deploy-frontend:
 	@echo "Building frontend for PROD..."
 	@docker build --platform linux/amd64 \
-		--build-arg NEXT_PUBLIC_BACKEND_DELEGATION_ADDRESS=0x5e262fEc49760deeF5267f68256be7A1134D3Aaa \
-		--build-arg NEXT_PUBLIC_TREASURY_ADDRESS=0x9DF3E1A96a36BF64fD81a9CC37a2ae9107bE690D \
+		--build-arg NEXT_PUBLIC_BACKEND_DELEGATION_ADDRESS=0x1F46E38D67507a845aD3FF1321297640E35D88b4 \
+		--build-arg NEXT_PUBLIC_TREASURY_ADDRESS=0x768E174c570bDb5d5E86201c393A1805fa2C2C02 \
 		-t $(PROD_REGISTRY)/frontend:latest ./frontend
 	@echo "Pushing to Artifact Registry..."
 	@docker push $(PROD_REGISTRY)/frontend:latest

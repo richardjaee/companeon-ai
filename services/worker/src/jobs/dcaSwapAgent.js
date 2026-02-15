@@ -74,15 +74,46 @@ const EXPLORERS = {
   84532: 'https://sepolia.basescan.org'
 };
 
-function calculateNextRun(frequency) {
+function calculateNextRun(frequency, options = {}) {
   const now = new Date();
-  switch (frequency) {
-    case 'hourly': return new Date(now.getTime() + 60 * 60 * 1000);
-    case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
-    default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const { scheduledTime, timezone } = options;
+
+  if (!scheduledTime || frequency === 'test') {
+    switch (frequency) {
+      case 'hourly': return new Date(now.getTime() + 60 * 60 * 1000);
+      case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
+      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
   }
+
+  const [hour, minute] = scheduledTime.split(':').map(Number);
+  const tz = timezone || 'UTC';
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric', minute: 'numeric',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const nowHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const nowMin = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+
+  const targetMinutes = hour * 60 + minute;
+  const currentMinutes = nowHour * 60 + nowMin;
+  let minutesUntil = targetMinutes - currentMinutes;
+
+  if (minutesUntil <= 0) {
+    switch (frequency) {
+      case 'hourly': minutesUntil += 60; break;
+      case 'daily': minutesUntil += 24 * 60; break;
+      case 'weekly': minutesUntil += 7 * 24 * 60; break;
+      default: minutesUntil += 24 * 60; break;
+    }
+  }
+
+  return new Date(now.getTime() + minutesUntil * 60 * 1000);
 }
 
 function resolveToken(symbol, chainId) {
@@ -137,11 +168,13 @@ async function fetch0xQuote(chainId, sellToken, buyToken, sellAmount, taker, sli
  */
 async function executeDCASwap(firestore, schedule) {
   const { scheduleId, walletAddress, fromToken, toToken, amount, chainId, slippageBps = 100 } = schedule;
+  const steps = [];
 
   const agentKey = process.env.BACKEND_SUBDELEGATION_KEY;
   if (!agentKey) throw new Error('BACKEND_SUBDELEGATION_KEY not configured');
 
   // Fetch sub-delegation
+  steps.push({ action: 'Fetching sub-delegation', timestamp: new Date().toISOString() });
   const subDelDoc = await firestore.collection(SUBDELEGATION_COLLECTION)
     .doc(`${walletAddress.toLowerCase()}_${scheduleId}`)
     .get();
@@ -152,6 +185,7 @@ async function executeDCASwap(firestore, schedule) {
   if (!subDel.chainedPermissionsContext) {
     throw new Error('No chained permissions context in sub-delegation');
   }
+  steps.push({ action: 'Sub-delegation loaded', detail: `delegationManager: ${subDel.delegationManager}`, timestamp: new Date().toISOString() });
 
   // Resolve token addresses
   const fromResolved = resolveToken(fromToken, chainId);
@@ -159,6 +193,7 @@ async function executeDCASwap(firestore, schedule) {
 
   if (!fromResolved) throw new Error(`Token ${fromToken} not found on chain ${chainId}`);
   if (!toResolved) throw new Error(`Token ${toToken} not found on chain ${chainId}`);
+  steps.push({ action: 'Resolved tokens', detail: `${fromToken} (${fromResolved.address}) -> ${toToken} (${toResolved.address})`, timestamp: new Date().toISOString() });
 
   // Parse amount to smallest units
   const sellAmountWei = ethers.parseUnits(amount, fromResolved.decimals).toString();
@@ -174,6 +209,7 @@ async function executeDCASwap(firestore, schedule) {
   );
 
   // Fetch 0x quote with user's wallet as taker
+  steps.push({ action: 'Fetching 0x quote', detail: `sell ${amount} ${fromToken} (${sellAmountWei} wei), slippage: ${slippageBps}bps`, timestamp: new Date().toISOString() });
   let quote = await fetch0xQuote(
     chainId,
     fromResolved.address,
@@ -182,11 +218,13 @@ async function executeDCASwap(firestore, schedule) {
     walletAddress,
     slippageBps
   );
+  steps.push({ action: 'Quote received', detail: `buyAmount: ${quote.buyAmount}, price: ${quote.price || 'N/A'}`, timestamp: new Date().toISOString() });
 
   // Handle ERC-20 approval if needed
   const isNative = fromToken.toUpperCase() === 'ETH';
   if (!isNative && quote.issues?.allowance) {
     console.log(`[DCA Agent] ${scheduleId}: approving AllowanceHolder for ${fromToken}`);
+    steps.push({ action: 'Approving ERC-20 allowance', detail: `spender: ${quote.issues.allowance.spender}`, timestamp: new Date().toISOString() });
 
     const iface = new ethers.Interface(['function approve(address spender, uint256 amount)']);
     const approveData = iface.encodeFunctionData('approve', [
@@ -202,8 +240,10 @@ async function executeDCASwap(firestore, schedule) {
     );
     await approveTx.wait();
     console.log(`[DCA Agent] ${scheduleId}: approval confirmed, tx: ${approveTx.hash}`);
+    steps.push({ action: 'Approval confirmed', detail: approveTx.hash, timestamp: new Date().toISOString() });
 
     // Re-fetch quote with fresh pricing after approval
+    steps.push({ action: 'Re-fetching quote post-approval', timestamp: new Date().toISOString() });
     quote = await fetch0xQuote(
       chainId,
       fromResolved.address,
@@ -212,9 +252,11 @@ async function executeDCASwap(firestore, schedule) {
       walletAddress,
       slippageBps
     );
+    steps.push({ action: 'Quote received', detail: `buyAmount: ${quote.buyAmount}`, timestamp: new Date().toISOString() });
   }
 
   // Execute swap via delegation
+  steps.push({ action: 'Submitting swap via redeemDelegations', timestamp: new Date().toISOString() });
   const swapExecution = encodeExecution(
     quote.transaction.to,
     BigInt(quote.transaction.value || 0),
@@ -228,15 +270,23 @@ async function executeDCASwap(firestore, schedule) {
   );
 
   console.log(`[DCA Agent] ${scheduleId}: swap TX sent: ${tx.hash}`);
+  steps.push({ action: 'Transaction sent', detail: tx.hash, timestamp: new Date().toISOString() });
+
   const receipt = await tx.wait();
+  steps.push({ action: 'Transaction confirmed', detail: `gas: ${receipt.gasUsed.toString()}`, timestamp: new Date().toISOString() });
+
+  // Format buyAmount for display
+  const buyDecimals = toResolved.decimals;
+  const buyAmountFormatted = ethers.formatUnits(quote.buyAmount, buyDecimals);
 
   return {
     success: true,
     txHash: tx.hash,
     gasUsed: receipt.gasUsed.toString(),
     agentAddress: agentWallet.address,
-    buyAmount: quote.buyAmount,
-    buyToken: toToken
+    buyAmount: buyAmountFormatted,
+    buyToken: toToken,
+    steps
   };
 }
 
@@ -306,13 +356,20 @@ export async function runDCASwapAgent(firestore) {
         // Update schedule on success
         const newCount = (schedule.executionCount || 0) + 1;
         const shouldComplete = schedule.maxExecutions && newCount >= schedule.maxExecutions;
-        const nextRun = calculateNextRun(schedule.frequency);
+        const nextRun = calculateNextRun(schedule.frequency, {
+          scheduledTime: schedule.scheduledTime,
+          timezone: schedule.timezone
+        });
 
         const executionRecord = {
           success: true,
           txHash: result.txHash,
           gasUsed: result.gasUsed,
           buyAmount: result.buyAmount,
+          fromToken: schedule.fromToken,
+          toToken: schedule.toToken,
+          sellAmount: schedule.amount,
+          steps: result.steps || [],
           executedAt: new Date().toISOString(),
           executionNumber: newCount
         };
@@ -377,8 +434,11 @@ export async function runDCASwapAgent(firestore) {
   }
 }
 
-function appendToArray(existingArray, newItem) {
+function appendToArray(existingArray, newItem, maxItems = 100) {
   const arr = Array.isArray(existingArray) ? [...existingArray] : [];
   arr.push(newItem);
+  if (arr.length > maxItems) {
+    return arr.slice(arr.length - maxItems);
+  }
   return arr;
 }

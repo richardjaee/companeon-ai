@@ -27,14 +27,44 @@ function getAgentAddress() {
   return new ethers.Wallet(key).address;
 }
 
-function calculateNextRun(frequency) {
+function calculateNextRun(frequency, options = {}) {
   const now = new Date();
-  switch (frequency) {
-    case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
-    default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const { scheduledTime, timezone } = options;
+
+  if (!scheduledTime || frequency === 'test') {
+    switch (frequency) {
+      case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
+      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
   }
+
+  const [hour, minute] = scheduledTime.split(':').map(Number);
+  const tz = timezone || 'UTC';
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric', minute: 'numeric',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const nowHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const nowMin = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+
+  const targetMinutes = hour * 60 + minute;
+  const currentMinutes = nowHour * 60 + nowMin;
+  let minutesUntil = targetMinutes - currentMinutes;
+
+  if (minutesUntil <= 0) {
+    switch (frequency) {
+      case 'daily': minutesUntil += 24 * 60; break;
+      case 'weekly': minutesUntil += 7 * 24 * 60; break;
+      default: minutesUntil += 24 * 60; break;
+    }
+  }
+
+  return new Date(now.getTime() + minutesUntil * 60 * 1000);
 }
 
 function parseDuration(durationStr) {
@@ -83,6 +113,10 @@ export const rebalancingAgentTools = [
       tokens: z.array(tokenAllocationSchema).min(2).max(5)
         .describe('Target token allocations - must sum to 100%'),
       frequency: z.enum(['daily', 'weekly', 'test']),
+      scheduledTime: z.string().optional()
+        .describe('Time of day in HH:MM 24h format (e.g., "14:30" for 2:30 PM). If omitted, runs at interval from creation time.'),
+      timezone: z.string().optional()
+        .describe('IANA timezone for scheduledTime (e.g., "America/New_York", "Europe/London"). Required when scheduledTime is set.'),
       thresholdPercent: z.number().optional()
         .describe('Minimum deviation (%) before rebalancing. Default: 5'),
       slippageBps: z.number().optional()
@@ -93,7 +127,7 @@ export const rebalancingAgentTools = [
     }),
     tags: ['rebalancing', 'schedule', 'a2a', 'agent', 'preview'],
     handler: async (params, context) => {
-      const { tokens, frequency, thresholdPercent = 5, slippageBps = 100, expiresIn, maxExecutions } = params;
+      const { tokens, frequency, scheduledTime, timezone, thresholdPercent = 5, slippageBps = 100, expiresIn, maxExecutions } = params;
       const walletAddress = context?.walletAddress || context?.memoryFacts?.walletAddress;
       if (!walletAddress) throw new Error('Wallet address required');
 
@@ -112,8 +146,16 @@ export const rebalancingAgentTools = [
         }
       }
 
-      const nextRun = calculateNextRun(frequency);
+      const nextRun = calculateNextRun(frequency, { scheduledTime, timezone });
       const durationSec = parseDuration(expiresIn);
+
+      const freqDisplay = scheduledTime && frequency !== 'test'
+        ? `${formatFrequency(frequency)} at ${scheduledTime}${timezone ? ` (${timezone})` : ''}`
+        : formatFrequency(frequency);
+
+      const firstRunDisplay = timezone
+        ? nextRun.toLocaleString('en-US', { timeZone: timezone })
+        : nextRun.toLocaleString();
 
       const allocationsTable = tokens
         .map(t => `| ${t.symbol.toUpperCase()} | ${t.targetPercent}% |`)
@@ -123,11 +165,11 @@ export const rebalancingAgentTools = [
         ask: true,
         preview: {
           tokens: tokens.map(t => ({ symbol: t.symbol.toUpperCase(), targetPercent: t.targetPercent })),
-          frequency: formatFrequency(frequency),
+          frequency: freqDisplay,
           thresholdPercent,
           slippageBps,
           expiresIn: durationSec ? formatDuration(durationSec) : 'Inherits parent delegation',
-          firstExecution: nextRun.toLocaleString(),
+          firstExecution: firstRunDisplay,
           maxExecutions: maxExecutions || 'unlimited'
         },
         showToUser: `**Portfolio Rebalancing Preview**
@@ -138,10 +180,10 @@ ${allocationsTable}
 
 | Field | Value |
 |-------|-------|
-| Frequency | ${formatFrequency(frequency)} |
+| Frequency | ${freqDisplay} |
 | Threshold | ${thresholdPercent}% deviation before rebalancing |
 | Expires | ${durationSec ? formatDuration(durationSec) : 'Inherits parent delegation'} |
-| First Check | ${nextRun.toLocaleString()} |
+| First Check | ${firstRunDisplay} |
 | Max Runs | ${maxExecutions || 'Unlimited'} |
 | Slippage | ${slippageBps / 100}% |
 
@@ -157,6 +199,8 @@ This will create sub-delegations for each portfolio token, allowing the rebalanc
     parameters: z.object({
       tokens: z.array(tokenAllocationSchema).min(2).max(5),
       frequency: z.enum(['daily', 'weekly', 'test']),
+      scheduledTime: z.string().optional(),
+      timezone: z.string().optional(),
       thresholdPercent: z.number().optional(),
       slippageBps: z.number().optional(),
       expiresIn: z.string().optional(),
@@ -165,7 +209,7 @@ This will create sub-delegations for each portfolio token, allowing the rebalanc
     }),
     tags: ['rebalancing', 'schedule', 'a2a', 'agent', 'write'],
     handler: async (params, context) => {
-      const { tokens, frequency, thresholdPercent = 5, slippageBps = 100, expiresIn, name, maxExecutions } = params;
+      const { tokens, frequency, scheduledTime, timezone, thresholdPercent = 5, slippageBps = 100, expiresIn, name, maxExecutions } = params;
       const walletAddress = context?.walletAddress || context?.memoryFacts?.walletAddress;
       const chainId = context?.chainId || context?.memoryFacts?.chainId || 8453;
       const logger = context?.logger;
@@ -255,7 +299,7 @@ This will create sub-delegations for each portfolio token, allowing the rebalanc
         targetAllocations[t.symbol.toUpperCase()] = t.targetPercent;
       }
 
-      const nextRun = calculateNextRun(frequency);
+      const nextRun = calculateNextRun(frequency, { scheduledTime, timezone });
       const schedule = {
         scheduleId,
         type: 'rebalancing',
@@ -266,6 +310,8 @@ This will create sub-delegations for each portfolio token, allowing the rebalanc
         thresholdPercent,
         slippageBps,
         frequency,
+        scheduledTime: scheduledTime || null,
+        timezone: timezone || null,
         status: 'active',
         nextRunAt: Timestamp.fromDate(nextRun),
         expiresAt: expiresAtTimestamp || null,
@@ -290,6 +336,10 @@ This will create sub-delegations for each portfolio token, allowing the rebalanc
         ? `${formatDuration(durationSec)} (${new Date(expiresAtTimestamp * 1000).toLocaleDateString()})`
         : 'Inherits parent delegation';
 
+      const freqDisplay = scheduledTime && frequency !== 'test'
+        ? `${formatFrequency(frequency)} at ${scheduledTime}${timezone ? ` (${timezone})` : ''}`
+        : formatFrequency(frequency);
+
       return {
         success: true,
         scheduleId,
@@ -303,14 +353,14 @@ ${allocationsTable}
 
 | Field | Value |
 |-------|-------|
-| Frequency | ${formatFrequency(frequency)} |
+| Frequency | ${freqDisplay} |
 | Threshold | ${thresholdPercent}% |
 | Expires | ${expiresDisplay} |
-| First Check | ${nextRun.toLocaleString()} |
+| First Check | ${timezone ? nextRun.toLocaleString('en-US', { timeZone: timezone }) : nextRun.toLocaleString()} |
 | Max Runs | ${maxExecutions || 'Unlimited'} |
 | Slippage | ${slippageBps / 100}% |
 
-Sub-delegations created for ${subDelegationTokens.join(', ')}. The agent will check allocations ${formatFrequency(frequency).toLowerCase()} and rebalance when any token drifts more than ${thresholdPercent}% from target.`
+Sub-delegations created for ${subDelegationTokens.join(', ')}. The agent will check allocations ${freqDisplay.toLowerCase()} and rebalance when any token drifts more than ${thresholdPercent}% from target.`
       };
     }
   },

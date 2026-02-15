@@ -70,14 +70,44 @@ const EXPLORERS = {
   84532: 'https://sepolia.basescan.org'
 };
 
-function calculateNextRun(frequency) {
+function calculateNextRun(frequency, options = {}) {
   const now = new Date();
-  switch (frequency) {
-    case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
-    default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const { scheduledTime, timezone } = options;
+
+  if (!scheduledTime || frequency === 'test') {
+    switch (frequency) {
+      case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
+      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
   }
+
+  const [hour, minute] = scheduledTime.split(':').map(Number);
+  const tz = timezone || 'UTC';
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric', minute: 'numeric',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const nowHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const nowMin = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+
+  const targetMinutes = hour * 60 + minute;
+  const currentMinutes = nowHour * 60 + nowMin;
+  let minutesUntil = targetMinutes - currentMinutes;
+
+  if (minutesUntil <= 0) {
+    switch (frequency) {
+      case 'daily': minutesUntil += 24 * 60; break;
+      case 'weekly': minutesUntil += 7 * 24 * 60; break;
+      default: minutesUntil += 24 * 60; break;
+    }
+  }
+
+  return new Date(now.getTime() + minutesUntil * 60 * 1000);
 }
 
 function resolveToken(symbol, chainId) {
@@ -296,6 +326,7 @@ function calculateSwaps(balances, prices, targetAllocations) {
  */
 async function executeRebalancing(firestore, schedule) {
   const { scheduleId, walletAddress, targetAllocations, chainId, slippageBps = 100, thresholdPercent = 5 } = schedule;
+  const steps = [];
 
   const agentKey = process.env.BACKEND_SUBDELEGATION_KEY;
   if (!agentKey) throw new Error('BACKEND_SUBDELEGATION_KEY not configured');
@@ -307,16 +338,25 @@ async function executeRebalancing(firestore, schedule) {
   const tokens = Object.keys(targetAllocations);
 
   // Get current balances
+  steps.push({ action: 'Fetching balances', detail: tokens.join(', '), timestamp: new Date().toISOString() });
   const balances = await getBalances(walletAddress, tokens, chainId, provider);
   if (Object.keys(balances).length === 0) {
-    return { success: true, skipped: true, reason: 'no_balances' };
+    steps.push({ action: 'Skipped', detail: 'No balances found', timestamp: new Date().toISOString() });
+    return { success: true, skipped: true, reason: 'no_balances', steps };
   }
 
+  const balanceSummary = Object.entries(balances).map(([s, b]) => `${b.formatted} ${s}`).join(', ');
+  steps.push({ action: 'Balances loaded', detail: balanceSummary, timestamp: new Date().toISOString() });
+
   // Fetch USD prices
+  steps.push({ action: 'Fetching USD prices', detail: tokens.join(', '), timestamp: new Date().toISOString() });
   const prices = await fetchPrices(tokens);
   if (Object.keys(prices).length === 0) {
     throw new Error('Failed to fetch prices for portfolio tokens');
   }
+
+  const priceSummary = Object.entries(prices).map(([s, p]) => `${s}: $${Number(p).toFixed(2)}`).join(', ');
+  steps.push({ action: 'Prices loaded', detail: priceSummary, timestamp: new Date().toISOString() });
 
   // Check if any token deviates beyond threshold
   let totalValueUsd = 0;
@@ -327,28 +367,37 @@ async function executeRebalancing(firestore, schedule) {
   }
 
   if (totalValueUsd === 0) {
-    return { success: true, skipped: true, reason: 'zero_portfolio_value' };
+    steps.push({ action: 'Skipped', detail: 'Zero portfolio value', timestamp: new Date().toISOString() });
+    return { success: true, skipped: true, reason: 'zero_portfolio_value', steps };
   }
 
   let maxDeviation = 0;
+  const allocationDetails = [];
   for (const [symbol, targetPct] of Object.entries(targetAllocations)) {
     const balance = balances[symbol];
     const price = prices[symbol] || 0;
     const currentPct = balance ? (balance.formatted * price / totalValueUsd) * 100 : 0;
     const deviation = Math.abs(currentPct - targetPct);
     if (deviation > maxDeviation) maxDeviation = deviation;
+    allocationDetails.push(`${symbol}: ${currentPct.toFixed(1)}% (target ${targetPct}%)`);
   }
+
+  steps.push({ action: 'Allocation analysis', detail: `Portfolio: $${totalValueUsd.toFixed(2)} | ${allocationDetails.join(', ')} | Max deviation: ${maxDeviation.toFixed(1)}%`, timestamp: new Date().toISOString() });
 
   if (maxDeviation < thresholdPercent) {
     console.log(`[Rebalancing] ${scheduleId}: portfolio within bounds (max deviation: ${maxDeviation.toFixed(2)}%)`);
-    return { success: true, skipped: true, reason: 'within_threshold', maxDeviation };
+    steps.push({ action: 'Skipped', detail: `Within ${thresholdPercent}% threshold`, timestamp: new Date().toISOString() });
+    return { success: true, skipped: true, reason: 'within_threshold', maxDeviation, steps };
   }
 
   // Calculate required swaps
   const swaps = calculateSwaps(balances, prices, targetAllocations);
   if (swaps.length === 0) {
-    return { success: true, skipped: true, reason: 'no_swaps_needed' };
+    steps.push({ action: 'Skipped', detail: 'No swaps needed after calculation', timestamp: new Date().toISOString() });
+    return { success: true, skipped: true, reason: 'no_swaps_needed', steps };
   }
+
+  steps.push({ action: 'Swaps calculated', detail: swaps.map(s => `${s.sellAmount} ${s.sellToken} -> ${s.buyToken} (~$${s.valueUsd.toFixed(2)})`).join('; '), timestamp: new Date().toISOString() });
 
   console.log(`[Rebalancing] ${scheduleId}: executing ${swaps.length} swap(s), max deviation: ${maxDeviation.toFixed(2)}%`);
 
@@ -364,6 +413,7 @@ async function executeRebalancing(firestore, schedule) {
 
     if (!subDelDoc.exists) {
       console.error(`[Rebalancing] ${scheduleId}: no sub-delegation for ${sellSymbol}`);
+      steps.push({ action: 'Sub-delegation missing', detail: sellSymbol, timestamp: new Date().toISOString() });
       continue;
     }
 
@@ -389,6 +439,7 @@ async function executeRebalancing(firestore, schedule) {
 
     try {
       // Fetch 0x quote
+      steps.push({ action: 'Fetching 0x quote', detail: `${swap.sellAmount} ${sellSymbol} -> ${swap.buyToken}`, timestamp: new Date().toISOString() });
       let quote = await fetch0xQuote(
         chainId,
         sellResolved.address,
@@ -397,11 +448,13 @@ async function executeRebalancing(firestore, schedule) {
         walletAddress,
         slippageBps
       );
+      steps.push({ action: 'Quote received', detail: `buyAmount: ${quote.buyAmount}`, timestamp: new Date().toISOString() });
 
       // Handle ERC-20 approval if needed
       const isNative = sellSymbol === 'ETH';
       if (!isNative && quote.issues?.allowance) {
         console.log(`[Rebalancing] ${scheduleId}: approving ${sellSymbol} for swap`);
+        steps.push({ action: 'Approving ERC-20 allowance', detail: `${sellSymbol} -> ${quote.issues.allowance.spender}`, timestamp: new Date().toISOString() });
 
         const iface = new ethers.Interface(['function approve(address spender, uint256 amount)']);
         const approveData = iface.encodeFunctionData('approve', [
@@ -417,6 +470,7 @@ async function executeRebalancing(firestore, schedule) {
         );
         await approveTx.wait();
         console.log(`[Rebalancing] ${scheduleId}: approval confirmed for ${sellSymbol}`);
+        steps.push({ action: 'Approval confirmed', detail: approveTx.hash, timestamp: new Date().toISOString() });
 
         // Re-fetch quote with fresh pricing
         quote = await fetch0xQuote(
@@ -430,6 +484,7 @@ async function executeRebalancing(firestore, schedule) {
       }
 
       // Execute swap via delegation
+      steps.push({ action: 'Submitting swap via redeemDelegations', detail: `${sellSymbol} -> ${swap.buyToken}`, timestamp: new Date().toISOString() });
       const swapExecution = encodeExecution(
         quote.transaction.to,
         BigInt(quote.transaction.value || 0),
@@ -444,6 +499,7 @@ async function executeRebalancing(firestore, schedule) {
 
       const receipt = await tx.wait();
       console.log(`[Rebalancing] ${scheduleId}: swapped ${swap.sellAmount} ${sellSymbol} -> ${swap.buyToken}, tx: ${tx.hash}`);
+      steps.push({ action: 'Swap confirmed', detail: `${swap.sellAmount} ${sellSymbol} -> ${swap.buyToken}, tx: ${tx.hash}, gas: ${receipt.gasUsed.toString()}`, timestamp: new Date().toISOString() });
 
       executedSwaps.push({
         sellToken: sellSymbol,
@@ -456,6 +512,7 @@ async function executeRebalancing(firestore, schedule) {
 
     } catch (swapErr) {
       console.error(`[Rebalancing] ${scheduleId}: swap ${sellSymbol}->${swap.buyToken} failed:`, swapErr.message);
+      steps.push({ action: 'Swap failed', detail: `${sellSymbol} -> ${swap.buyToken}: ${swapErr.message}`, timestamp: new Date().toISOString() });
       executedSwaps.push({
         sellToken: sellSymbol,
         buyToken: swap.buyToken,
@@ -470,7 +527,8 @@ async function executeRebalancing(firestore, schedule) {
     maxDeviation,
     totalValueUsd,
     swaps: executedSwaps,
-    agentAddress: agentWallet.address
+    agentAddress: agentWallet.address,
+    steps
   };
 }
 
@@ -543,7 +601,10 @@ export async function runRebalancingAgent(firestore) {
         // Update schedule on completion
         const newCount = result.skipped ? (schedule.executionCount || 0) : (schedule.executionCount || 0) + 1;
         const shouldComplete = schedule.maxExecutions && newCount >= schedule.maxExecutions;
-        const nextRun = calculateNextRun(schedule.frequency);
+        const nextRun = calculateNextRun(schedule.frequency, {
+          scheduledTime: schedule.scheduledTime,
+          timezone: schedule.timezone
+        });
 
         const executionRecord = {
           success: result.success,
@@ -551,6 +612,7 @@ export async function runRebalancingAgent(firestore) {
           reason: result.reason || null,
           maxDeviation: result.maxDeviation || null,
           swaps: result.swaps || [],
+          steps: result.steps || [],
           executedAt: new Date().toISOString(),
           executionNumber: newCount
         };
@@ -623,8 +685,11 @@ export async function runRebalancingAgent(firestore) {
   }
 }
 
-function appendToArray(existingArray, newItem) {
+function appendToArray(existingArray, newItem, maxItems = 100) {
   const arr = Array.isArray(existingArray) ? [...existingArray] : [];
   arr.push(newItem);
+  if (arr.length > maxItems) {
+    return arr.slice(arr.length - maxItems);
+  }
   return arr;
 }
