@@ -120,7 +120,7 @@ export default function AccountView() {
   const used = balance ? balance.used : 0;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-176px)] bg-white">
+    <div className="flex flex-col h-full bg-white">
       <div className="pb-6 mt-10 px-6">
         <h1 className="text-4xl font-medium text-gray-900">Usage</h1>
         {address && (
@@ -186,7 +186,7 @@ export default function AccountView() {
             <button
               onClick={handlePurchase}
               disabled={isPurchasing}
-              className={`h-[48px] px-6 rounded-[48px] text-base font-bold text-white transition-all ${
+              className={`h-[42px] px-6 rounded-[4px] text-sm font-bold text-white transition-all ${
                 isPurchasing
                   ? 'bg-gray-300 cursor-not-allowed'
                   : 'bg-[#AD29FF] hover:bg-[#9523DC]'
@@ -204,16 +204,6 @@ export default function AccountView() {
           )}
         </div>
 
-        {/* How credits work */}
-        <div className="py-6">
-          <h3 className="text-base font-bold text-gray-900 mb-3">How credits work</h3>
-          <ul className="space-y-2 text-sm text-gray-500">
-            <li>New wallets receive <strong className="text-gray-700">20 free credits</strong> to try the AI assistant.</li>
-            <li>Each prompt to the AI uses <strong className="text-gray-700">1 credit</strong>.</li>
-            <li>Purchase <strong className="text-gray-700">100 credits for $4.99</strong> USDC.</li>
-            <li>Payment is verified on-chain. Credits are added instantly.</li>
-          </ul>
-        </div>
       </div>
     </div>
   );

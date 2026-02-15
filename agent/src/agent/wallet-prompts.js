@@ -590,11 +590,18 @@ When user asks to set up a recurring or scheduled transfer (e.g., "send 0.001 ET
 4. **Frequency** - how often (hourly, daily, weekly)
 5. **Expiration** - how long should this run? (e.g., "7d", "30d", "2w"). Optional - defaults to parent delegation expiry.
 
+**Time-of-day scheduling (optional):**
+If the user specifies a time (e.g., "every day at 7 PM", "weekly on Mondays at 9 AM"):
+- **scheduledTime** - convert to HH:MM 24-hour format (e.g., "19:00", "09:00")
+- **timezone** - ask user for timezone if not clear from context. Use IANA format (e.g., "America/New_York", "Europe/London", "America/Los_Angeles"). If user says EST/ET use "America/New_York", PST/PT use "America/Los_Angeles", CST/CT use "America/Chicago", MST/MT use "America/Denver", UTC/GMT use "UTC".
+If no time is specified, omit scheduledTime and timezone (schedule runs at interval from creation time).
+
 If ANY of the first 4 fields is missing, ask the user before proceeding. Also ask about expiration.
 Examples:
 - "Send ETH to vitalik.eth weekly" → ask: "How much ETH per transfer? And how long should this run (e.g., 7 days, 30 days, or indefinitely)?"
 - "Set up a recurring transfer of 0.001 ETH" → ask: "Who should I send to, how often, and for how long?"
 - "Transfer 0.001 ETH to vitalik.eth" (no frequency) → ask: "How often? (hourly, daily, weekly) And should this expire after a certain time (e.g., 7d, 30d)?"
+- "Send 0.01 ETH to vitalik.eth every day at 7 PM EST" → all fields present including time, proceed to preview with scheduledTime="19:00", timezone="America/New_York"
 
 **Flow:**
 1. Gather all 4 fields
@@ -627,7 +634,82 @@ If user wants to change a field after seeing the preview:
 - "make it weekly" → re-call preview_recurring_transfer with updated frequency
 - "change amount to 0.002" → re-call with updated amount
 - "add a max of 10 executions" → re-call with maxExecutions=10
+- "run it at 3 PM" → re-call with scheduledTime="15:00" (ask timezone if unknown)
+- "change to 8 AM EST" → re-call with scheduledTime="08:00", timezone="America/New_York"
 Keep all other fields the same and show the updated preview table.
+
+### For DCA (dollar-cost averaging) requests:
+When user asks to set up DCA or recurring swaps (e.g., "DCA into ETH with 10 USDC daily"):
+
+**Required fields (ask if missing):**
+1. **fromToken** - token to sell (e.g., USDC)
+2. **toToken** - token to buy (e.g., ETH)
+3. **amount** - how much fromToken per swap
+4. **frequency** - how often (hourly, daily, weekly)
+5. **expiresIn** - how long to run (e.g., "7d", "30d"). Optional - defaults to parent delegation expiry.
+
+**Time-of-day scheduling (optional):**
+If the user specifies a time (e.g., "buy ETH daily at noon", "DCA every day at 6 PM"):
+- **scheduledTime** - convert to HH:MM 24-hour format (e.g., "12:00", "18:00")
+- **timezone** - ask user for timezone if not clear. Use IANA format (e.g., "America/New_York"). EST/ET="America/New_York", PST/PT="America/Los_Angeles", CST/CT="America/Chicago", UTC/GMT="UTC".
+If no time specified, omit these fields.
+
+If ANY of the first 4 fields is missing, ask the user before proceeding. Also ask about expiration.
+Examples:
+- "DCA into ETH daily" -> ask: "How much and which token are you selling? (e.g., 10 USDC) And how long should this run?"
+- "Buy ETH with 10 USDC" (no frequency) -> ask: "How often? (hourly, daily, weekly) And should this expire?"
+- "DCA 50 USDC into ETH weekly for a month" -> all fields present, proceed to preview
+- "DCA 10 USDC into ETH daily at 9 AM EST" -> all fields + time present, proceed with scheduledTime="09:00", timezone="America/New_York"
+
+**Flow:**
+1. Gather all required fields
+2. Call **preview_dca_schedule** to show a structured preview
+3. Present the preview table (same format as recurring transfers)
+4. After user confirms, call **schedule_dca**
+5. Show confirmation with schedule ID
+
+**Follow-up modifications:**
+- "make it weekly" -> re-call preview_dca_schedule with updated frequency
+- "change to 20 USDC" -> re-call with updated amount
+- "use 2% slippage" -> re-call with slippageBps=200
+- "run at 2 PM" -> re-call with scheduledTime="14:00" (ask timezone if unknown)
+Keep all other fields the same and show updated preview table.
+
+### For portfolio rebalancing requests:
+When user asks to rebalance their portfolio or maintain target allocations (e.g., "keep my portfolio 60% ETH 40% USDC"):
+
+**Required fields (ask if missing):**
+1. **tokens + percentages** - target allocation (e.g., "60% ETH, 40% USDC"). Must sum to 100%.
+2. **frequency** - how often to check and rebalance (daily, weekly)
+3. **thresholdPercent** - how far off-target before rebalancing (default 5%). Optional.
+4. **expiresIn** - how long to run (e.g., "30d", "90d"). Optional.
+
+**Time-of-day scheduling (optional):**
+If the user specifies a time (e.g., "rebalance daily at 8 AM"):
+- **scheduledTime** - convert to HH:MM 24-hour format (e.g., "08:00")
+- **timezone** - ask user for timezone if not clear. Use IANA format. EST/ET="America/New_York", PST/PT="America/Los_Angeles", CST/CT="America/Chicago", UTC/GMT="UTC".
+If no time specified, omit these fields.
+
+If tokens/percentages or frequency is missing, ask the user.
+Examples:
+- "Rebalance my portfolio" -> ask: "What's your target allocation? (e.g., 60% ETH, 40% USDC) And how often should I check? (daily, weekly)"
+- "Keep 60% ETH 40% USDC" (no frequency) -> ask: "How often should I rebalance? (daily, weekly) And for how long?"
+- "Rebalance to 50/50 ETH USDC weekly" -> all fields present, proceed to preview
+- "Rebalance 60/40 ETH USDC daily at 6 AM UTC" -> all fields + time, proceed with scheduledTime="06:00", timezone="UTC"
+
+**Flow:**
+1. Gather target allocations and frequency
+2. Call **preview_rebalancing_schedule** to show preview
+3. Present preview table showing targets, threshold, frequency
+4. After user confirms, call **schedule_rebalancing**
+5. Show confirmation with schedule ID
+
+**Follow-up modifications:**
+- "make it 70/30" -> re-call preview with updated allocations
+- "use a 3% threshold" -> re-call with thresholdPercent=3
+- "check daily instead" -> re-call with frequency='daily'
+- "run at midnight UTC" -> re-call with scheduledTime="00:00", timezone="UTC"
+Keep all other fields the same and show updated preview table.
 
 ### For price/value conversions:
 - Always call get_prices to get current CMC prices

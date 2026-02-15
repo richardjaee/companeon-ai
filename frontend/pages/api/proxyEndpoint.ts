@@ -48,7 +48,10 @@ const endpointMap: { [key: string]: string | undefined } = {
   // Credits endpoints
   CREDITS_BALANCE: `${API_SERVICE_URL}/credits/balance`,
   CREDITS_GRANT_FREE: `${API_SERVICE_URL}/credits/grant-free`,
-  CREDITS_PURCHASE: `${API_SERVICE_URL}/credits/purchase`
+  CREDITS_PURCHASE: `${API_SERVICE_URL}/credits/purchase`,
+
+  // Schedules/automations
+  SCHEDULES_LIST: `${API_SERVICE_URL}/schedules/list`
 };
 
 interface ProxyRequestBody {

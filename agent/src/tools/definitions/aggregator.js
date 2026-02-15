@@ -297,6 +297,8 @@ function formatRouting(route) {
     .join(' + ');
 }
 
+export { resolveTokenAddress, fetch0xQuote, TOKEN_ADDRESSES, TOKEN_DECIMALS, NATIVE_TOKEN_ADDRESS };
+
 export const aggregatorTools = [
   {
     name: 'get_aggregated_quote',

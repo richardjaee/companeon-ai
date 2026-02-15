@@ -53,15 +53,46 @@ const EXPLORERS = {
   84532: 'https://sepolia.basescan.org'
 };
 
-function calculateNextRun(frequency) {
+function calculateNextRun(frequency, options = {}) {
   const now = new Date();
-  switch (frequency) {
-    case 'hourly': return new Date(now.getTime() + 60 * 60 * 1000);
-    case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
-    default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const { scheduledTime, timezone } = options;
+
+  if (!scheduledTime || frequency === 'test') {
+    switch (frequency) {
+      case 'hourly': return new Date(now.getTime() + 60 * 60 * 1000);
+      case 'daily': return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      case 'weekly': return new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      case 'test': return new Date(now.getTime() + 2 * 60 * 1000);
+      default: return new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    }
   }
+
+  const [hour, minute] = scheduledTime.split(':').map(Number);
+  const tz = timezone || 'UTC';
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric', minute: 'numeric',
+    hour12: false
+  });
+  const parts = formatter.formatToParts(now);
+  const nowHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0');
+  const nowMin = parseInt(parts.find(p => p.type === 'minute')?.value || '0');
+
+  const targetMinutes = hour * 60 + minute;
+  const currentMinutes = nowHour * 60 + nowMin;
+  let minutesUntil = targetMinutes - currentMinutes;
+
+  if (minutesUntil <= 0) {
+    switch (frequency) {
+      case 'hourly': minutesUntil += 60; break;
+      case 'daily': minutesUntil += 24 * 60; break;
+      case 'weekly': minutesUntil += 7 * 24 * 60; break;
+      default: minutesUntil += 24 * 60; break;
+    }
+  }
+
+  return new Date(now.getTime() + minutesUntil * 60 * 1000);
 }
 
 function getTokenAddress(token, chainId) {
@@ -89,13 +120,15 @@ function encodeExecution(target, value, callData) {
  */
 async function executeRecurringTransfer(firestore, schedule) {
   const { scheduleId, walletAddress, recipient, token, amount, chainId } = schedule;
+  const steps = [];
 
-  const agentKey = process.env.TRANSFER_AGENT_PRIVATE_KEY;
+  const agentKey = process.env.BACKEND_SUBDELEGATION_KEY;
   if (!agentKey) {
-    throw new Error('TRANSFER_AGENT_PRIVATE_KEY not configured');
+    throw new Error('BACKEND_SUBDELEGATION_KEY not configured');
   }
 
   // Fetch sub-delegation (keyed by walletAddress_scheduleId for isolation)
+  steps.push({ action: 'Fetching sub-delegation', timestamp: new Date().toISOString() });
   const subDelDoc = await firestore.collection(SUBDELEGATION_COLLECTION)
     .doc(`${walletAddress.toLowerCase()}_${scheduleId}`)
     .get();
@@ -108,6 +141,7 @@ async function executeRecurringTransfer(firestore, schedule) {
   if (!subDel.chainedPermissionsContext) {
     throw new Error('No chained permissions context in sub-delegation');
   }
+  steps.push({ action: 'Sub-delegation loaded', detail: `delegationManager: ${subDel.delegationManager}`, timestamp: new Date().toISOString() });
 
   const rpcUrl = RPC_URLS[chainId] || RPC_URLS[8453];
   const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -120,6 +154,7 @@ async function executeRecurringTransfer(firestore, schedule) {
   if (isNative) {
     const valueWei = ethers.parseEther(amount);
     execution = encodeExecution(recipient, valueWei, '0x');
+    steps.push({ action: 'Built native transfer', detail: `${amount} ETH to ${recipient}`, timestamp: new Date().toISOString() });
   } else {
     // ERC-20 transfer
     const tokenAddress = schedule.tokenAddress || getTokenAddress(token, chainId);
@@ -131,9 +166,11 @@ async function executeRecurringTransfer(firestore, schedule) {
     const iface = new ethers.Interface(['function transfer(address to, uint256 amount)']);
     const calldata = iface.encodeFunctionData('transfer', [recipient, amountUnits]);
     execution = encodeExecution(tokenAddress, 0n, calldata);
+    steps.push({ action: 'Built ERC-20 transfer', detail: `${amount} ${token} (${tokenAddress}) to ${recipient}`, timestamp: new Date().toISOString() });
   }
 
   // Submit via DelegationManager with chained delegation context
+  steps.push({ action: 'Submitting redeemDelegations', timestamp: new Date().toISOString() });
   const delegationManager = new ethers.Contract(
     subDel.delegationManager,
     DELEGATION_MANAGER_ABI,
@@ -147,13 +184,17 @@ async function executeRecurringTransfer(firestore, schedule) {
   );
 
   console.log(`[Transfer Agent] TX sent: ${tx.hash} for ${scheduleId}`);
+  steps.push({ action: 'Transaction sent', detail: tx.hash, timestamp: new Date().toISOString() });
+
   const receipt = await tx.wait();
+  steps.push({ action: 'Transaction confirmed', detail: `gas: ${receipt.gasUsed.toString()}`, timestamp: new Date().toISOString() });
 
   return {
     success: true,
     txHash: tx.hash,
     gasUsed: receipt.gasUsed.toString(),
-    agentAddress: agentWallet.address
+    agentAddress: agentWallet.address,
+    steps
   };
 }
 
@@ -166,9 +207,9 @@ async function executeRecurringTransfer(firestore, schedule) {
 export async function runTransferAgent(firestore) {
   console.log('[Transfer Agent] Starting scheduled run...');
 
-  const agentKey = process.env.TRANSFER_AGENT_PRIVATE_KEY;
+  const agentKey = process.env.BACKEND_SUBDELEGATION_KEY;
   if (!agentKey) {
-    console.warn('[Transfer Agent] TRANSFER_AGENT_PRIVATE_KEY not set, skipping');
+    console.warn('[Transfer Agent] BACKEND_SUBDELEGATION_KEY not set, skipping');
     return { skipped: true, reason: 'No agent key configured' };
   }
 
@@ -224,12 +265,19 @@ export async function runTransferAgent(firestore) {
         // Update schedule state on success
         const newCount = (schedule.executionCount || 0) + 1;
         const shouldComplete = schedule.maxExecutions && newCount >= schedule.maxExecutions;
-        const nextRun = calculateNextRun(schedule.frequency);
+        const nextRun = calculateNextRun(schedule.frequency, {
+          scheduledTime: schedule.scheduledTime,
+          timezone: schedule.timezone
+        });
 
         const executionRecord = {
           success: true,
           txHash: result.txHash,
           gasUsed: result.gasUsed,
+          amount: schedule.amount,
+          token: schedule.token,
+          recipient: schedule.recipient,
+          steps: result.steps || [],
           executedAt: new Date().toISOString(),
           executionNumber: newCount
         };
@@ -301,8 +349,11 @@ export async function runTransferAgent(firestore) {
 /**
  * Append to array without Firestore FieldValue (worker uses @google-cloud/firestore directly).
  */
-function appendToArray(existingArray, newItem) {
+function appendToArray(existingArray, newItem, maxItems = 100) {
   const arr = Array.isArray(existingArray) ? [...existingArray] : [];
   arr.push(newItem);
+  if (arr.length > maxItems) {
+    return arr.slice(arr.length - maxItems);
+  }
   return arr;
 }

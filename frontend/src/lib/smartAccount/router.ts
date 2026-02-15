@@ -1,48 +1,30 @@
-// Smart Account Router - ERC-7715 Advanced Permissions (Flask required)
+// Smart Account Router - ERC-7715 Advanced Permissions
 
 import { SmartAccountPermission, CreateSmartAccountResult } from './types';
-import { isMetaMaskFlask } from './detectFlask';
 import { createSmartAccountWithPermissions } from './index'; // ERC-7715
 
 export type SmartAccountImplementation = 'erc7715';
 
 export interface SmartAccountDetectionResult {
-  hasFlask: boolean;
   implementation: SmartAccountImplementation;
   message: string;
 }
 
 /**
- * Detect smart account implementation (ERC-7715 Flask required)
- * 
- * Note: This function no longer throws on Flask detection failure.
- * Flask detection can be unreliable, so we proceed anyway and let
- * the actual requestExecutionPermissions call succeed or fail.
- * This matches the test page behavior which works without detection.
+ * Detect smart account implementation.
+ * ERC-7715 is supported in MetaMask v13.17.0+ (regular extension).
  */
 export async function detectSmartAccountImplementation(
   ethereum: any
 ): Promise<SmartAccountDetectionResult> {
-  const hasFlask = await isMetaMaskFlask(ethereum);
-
-  // Always return success - let the actual permission request determine if Flask works
-  // Flask detection can return false even when Flask is installed and working
-  if (!hasFlask) {
-    
-    
-  }
-
   return {
-    hasFlask,
     implementation: 'erc7715',
-    message: hasFlask 
-      ? 'Using MetaMask Flask with ERC-7715 Advanced Permissions'
-      : 'Proceeding with ERC-7715 (Flask detection inconclusive)'
+    message: 'Using ERC-7715 Advanced Permissions'
   };
 }
 
 /**
- * Create smart account using ERC-7715 (Flask required)
+ * Create smart account using ERC-7715.
  *
  * This function grants ERC-7715 permissions on the specified chain.
  *
@@ -57,8 +39,6 @@ export async function createSmartAccount(
 ): Promise<CreateSmartAccountResult & { implementation: SmartAccountImplementation }> {
   const detection = await detectSmartAccountImplementation(ethereum);
 
-
-
   // Create ERC-7715 smart account with permissions on target chain
   const smartAccountResult = await createSmartAccountWithPermissions(
     ethereum,
@@ -68,18 +48,9 @@ export async function createSmartAccount(
     chainId
   );
 
-  
   // Return the ERC-7715 result directly (no NFT minting for wallet agent flow)
   return {
     ...smartAccountResult,
     implementation: 'erc7715'
   };
 }
-
-/**
- * Create smart account with NFT agent (ERC-7715 + NFT)
- * 
- * This helper is no longer used in the wallet-only flow.
- * Note: ERC-7715 runs on the target chain (Base, Ethereum, Sepolia).
- */
-// Removed createSmartAccountWithAgent and NFT agent creation
