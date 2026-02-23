@@ -20,6 +20,7 @@ import { autonomousAgentTools } from './autonomous-agents.js';
 import { dcaAgentTools } from './dca-agent.js';
 import { rebalancingAgentTools } from './rebalancing-agent.js';
 import { aggregatorTools } from './aggregator.js';
+import { walletNftTools } from './wallet-nfts.js';
 
 // Add default tags to tools that don't have them
 function tagTools(tools, defaultTags) {
@@ -104,6 +105,14 @@ export function registerWalletTools(registry) {
     registry.register(tool);
   }
 
+  // NFT tools - read holdings and transfer ERC-721s
+  for (const tool of walletNftTools) {
+    const tags = tool.name === 'transfer_nft'
+      ? ['tx', 'write', 'nft']
+      : ['free', 'read', 'nft'];
+    registry.register({ ...tool, tags: tool.tags || tags });
+  }
+
   // Aggregator tools - DEX aggregation via 0x
   for (const tool of aggregatorTools) {
     const tags = tool.name === 'execute_aggregated_swap'
@@ -131,6 +140,7 @@ export function getAllWalletTools() {
     ...tagTools(walletSecurityTools, ['free', 'read', 'security']),
     ...tagTools(walletApprovalTools, ['free', 'read', 'security']),
     ...tagTools(envioTools, ['free', 'read', 'history', 'envio']),
-    ...aggregatorTools.map(t => ({ ...t, tags: t.tags || (t.name === 'execute_aggregated_swap' ? ['tx', 'write', 'aggregator'] : ['free', 'read', 'aggregator']) }))
+    ...aggregatorTools.map(t => ({ ...t, tags: t.tags || (t.name === 'execute_aggregated_swap' ? ['tx', 'write', 'aggregator'] : ['free', 'read', 'aggregator']) })),
+    ...walletNftTools.map(t => ({ ...t, tags: t.tags || (t.name === 'transfer_nft' ? ['tx', 'write', 'nft'] : ['free', 'read', 'nft']) }))
   ];
 }

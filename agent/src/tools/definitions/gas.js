@@ -41,7 +41,8 @@ export const GAS_LIMITS = {
   swapSimple: 150000n,
   swapComplex: 300000n,
   delegationRedeem: 200000n,
-  x402Payment: 100000n
+  x402Payment: 100000n,
+  nftTransfer: 100000n
 };
 
 function getProvider(chainId = null) {
