@@ -3,7 +3,6 @@
 Managed by the Claude autonomous loop. See `CLAUDE.md` for protocol.
 
 ## Pending
-- [x] Add NFT agent tools (get_nft_holdings, transfer_nft, list_nft_collections) using the existing /assets/nfts API and DelegationSigner — the NFTCards UI exists but the agent has zero NFT tools registered
 - [ ] Add conditional price-triggered order scheduling: schedule_conditional_order and cancel_conditional_order agent tools, ConditionalOrders Firestore collection, worker job checking CoinMarketCap prices every minute and firing swaps/transfers when conditions are met
 - [ ] Add cross-chain bridge tool using Li.Fi or Socket aggregator API — chainConfig.js already defines Ethereum, Base, Arbitrum, Optimism but there is no bridge tool so users cannot move funds between chains through the agent
 - [ ] Add DeFi yield tools for Aave V3 on Base: get_yield_rates (fetch pool APYs), supply_to_aave (deposit ERC-20 via DelegationSigner), withdraw_from_aave (redeem aTokens) — add Aave V3 contract addresses to chainConfig.js for Base
@@ -25,6 +24,9 @@ Managed by the Claude autonomous loop. See `CLAUDE.md` for protocol.
 - [ ] Add Coinbase Agentic Wallets wrapper in agent/src/lib/agenticWallet.js using the CDP Agentic Wallets API (launched Feb 11 2026) — enables gasless Base mainnet transactions and built-in KYT screening as an alternative execution path to the current manual gas top-up flow via gasSponsor.js
 - [ ] Add Discord Components v2 interactive approval buttons to services/openclaw/skills/companeon-wallet/bins/companeon-wallet — emit structured button payloads for transfer and swap confirmations using the OpenClaw 2026 components response format so users can approve or reject wallet operations from Discord without leaving the chat
 - [ ] Add Jest test infrastructure across agent/ and frontend/ — create jest.config.js in each, add first unit tests for subDelegation.js (encodePermissionsContext, decodePermissionsContext, getDelegationHash) — no test files exist anywhere in the codebase; these delegation encoding functions are security-critical and encoding bugs could cause wallet exploits
+- [ ] Add ERC-1155 support to transfer_nft in agent/src/tools/definitions/wallet-nfts.js — current implementation only supports ERC-721 safeTransferFrom; add ERC-165 supportsInterface detection and ERC-1155 safeTransferFrom(from, to, id, amount, data) for semi-fungible token transfers
+- [ ] Add ALCHEMY_API_KEY-based NFT URL construction in wallet-nfts.js fetchNFTsFromAlchemy — current code appends /getNFTs to the raw RPC URL which breaks with non-Alchemy providers or RPC URLs with trailing paths; derive Alchemy base URL from ALCHEMY_API_KEY env var as fallback
 
 ## Done
 - [x] Implement OpenClaw integration with ERC-7710 sub-delegation and MetaMask gator-cli skill
+- [x] Add NFT agent tools (get_nft_holdings, transfer_nft, list_nft_collections) using the existing /assets/nfts API and DelegationSigner
